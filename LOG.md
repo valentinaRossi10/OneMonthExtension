@@ -140,3 +140,60 @@ One entry per session/action — used to track progress against `PLAN.md`.
 - Next: Stage 3/4 — design prompt templates per bug class (memory safety
   first) and start testing them against these `.ll` files manually via
   chat UI, since API access isn't set up yet.
+
+## 2026-07-11 — Branch `W1/format-exploration`: mentor reply + code-format research
+
+- Received a reply from Prof. Luo (mentor) with 4 reference papers
+  (FirmAgent NDSS'26, HermeScan NDSS'24, MANGODFA USENIX Sec'24, PANGOLIN
+  USENIX Sec'26) and a suggestion to try Ghidra and angr — tools that
+  operate on binaries, not source, and produce different IR formats
+  (Ghidra: P-code; angr: VEX IR) than the LLVM IR used so far.
+- Read all 4 papers (saved in `papers-11July/`) to understand how prior
+  work represents code for analysis. Found two distinct paradigms:
+  - **Algorithmic/deterministic static analysis** (HermeScan, MANGODFA):
+    no LLM, built on angr/VEX IR, doing classical dataflow/taint tracking
+    (Reaching Definition Analysis, Sink-to-Source Analysis, Assumed
+    Nonimpact). IR suits this because the "analyzer" is a fixed algorithm
+    that needs precise, unambiguous, uniform low-level instructions — not
+    readability.
+  - **LLM-as-analyzer** (FirmAgent, PANGOLIN): LLM agents do the actual
+    vulnerability reasoning, and both feed the LLM **decompiled pseudo-C**
+    (via IDA Pro), not raw IR or assembly — PANGOLIN states directly that
+    pseudocode is easier for LLMs than assembly-level representations.
+    Both also apply a cleanup/normalization pass to raw decompiler output
+    before using it (PANGOLIN: rule-based regex substitution for
+    data-segment references and loop→switch-case rewriting; FirmAgent: a
+    separate LLM refinement call) — plain decompiler output isn't used
+    as-is.
+  - Since this project's design also uses an LLM as the analysis engine,
+    the LLM-as-analyzer paradigm (pseudo-C) is the closer precedent, not
+    the algorithmic one (raw IR) — but this is a real design decision, not
+    an obvious default, so it was raised with the mentor rather than
+    assumed.
+  - Also noted: none of the 4 papers deeply cover this project's bug-class
+    scope (UAF, integer overflow, NULL deref, OOB read) — they cluster on
+    command injection and stack buffer overflow. This project's 5-sample,
+    5-class benchmark is already broader on that front, worth keeping
+    regardless of which representation is chosen.
+- Identified 4 possible code representations for the next stage, all
+  reusable against the existing 5 vulnerable/patched sample pairs:
+  1. LLVM IR from source (current, done) — `clang -emit-llvm`.
+  2. VEX IR from binary, via angr — matches HermeScan/MANGODFA.
+  3. Ghidra P-code from binary — direct analogue of VEX IR, uses the
+     tool the mentor named.
+  4. Decompiled pseudo-code from binary, via Ghidra + a cleanup pass —
+     matches FirmAgent/PANGOLIN, closest to what the LLM-based papers
+     actually validated.
+- Emailed the mentor summarizing this paradigm split and asking which
+  representation to pursue next (pseudo-code / VEX IR-P-code / stay with
+  LLVM IR), rather than guessing and re-implementing later.
+- **This branch exists specifically to isolate this exploration.** If the
+  mentor's answer is "stay with LLVM IR," switch back to
+  `W1/CVE-benchmark` (or merge only this LOG entry) and continue Stage 3/4
+  there without carrying over any binary/Ghidra/angr-specific work. If the
+  answer favors pseudo-code, VEX IR, or P-code, continue implementation on
+  this branch instead.
+- Next: wait for mentor's reply, then either (a) discard/park this branch
+  and resume Stage 3/4 on `W1/CVE-benchmark` with LLVM IR, or (b) compile
+  the 5 samples to actual binaries and implement the chosen representation
+  (angr/VEX, Ghidra/P-code, or Ghidra/pseudo-code + cleanup) here.
