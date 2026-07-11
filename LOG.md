@@ -105,3 +105,38 @@ One entry per session/action — used to track progress against `PLAN.md`.
 - Next: Stage 2 — generate LLVM IR (`.ll`) for all 5 samples with
   `clang -emit-llvm -g -O0`, checking which ones compile standalone vs.
   need more of BusyBox's build context pulled in.
+
+## 2026-07-11 — Stage 2: generated LLVM IR for all 5 samples
+
+- Confirmed standalone `clang -emit-llvm` fails on these files (missing
+  BusyBox-internal headers and config macros like `ENABLE_FEATURE_*`,
+  `IF_*`, which only exist once the source tree is configured).
+- Workflow that worked: clone BusyBox, checkout the target commit,
+  `make defconfig` to generate `include/autoconf.h`, then `make V=1
+  <file>.o` to capture the real compiler invocation (include paths,
+  defines) BusyBox's own build uses for that file. Adapted that command by
+  swapping `gcc ... -c -o file.o` for `clang -S -emit-llvm -g -O0 ... -o
+  file.ll`, dropping GCC-only flags clang doesn't recognize
+  (`-malign-data=abi`, `-fno-guess-branch-probability`).
+- Hit two issues worth remembering:
+  - Switching commits without regenerating `.config`/`autoconf.h` breaks
+    the build on older commits (Kconfig mismatch, `make` tries an
+    interactive `oldconfig` and aborts non-interactively). Fix: wipe and
+    regenerate the config after every checkout, not just once.
+  - The adapted command still contained the original build's `-Os`
+    (BusyBox default), which — appearing after our `-O0` — won and caused
+    optimization/inlining that silently removed a target function
+    (`get_next_block` vanished, inlined into its caller). Fix: strip all
+    `-O*` flags from the captured command before adding `-O0`, then
+    verified every target function was still present as a separate
+    `define` in the resulting IR.
+- Generated and verified vulnerable + patched `.ll` pairs for all 5
+  samples; confirmed each target function (`option_to_env`, `nvalloc`,
+  `get_next_block`, `man_main`, `unpack_lzma_stream`) appears as a `define`
+  in the expected file(s) — and confirmed `nvalloc` is correctly *absent*
+  from the CVE-2021-42386 patched IR, since the fix removed it entirely.
+- Copied results into `ir/<sample-name>/{vulnerable,patched}.ll` for all 5
+  samples. Still on branch `W1/CVE-benchmark`, not yet committed.
+- Next: Stage 3/4 — design prompt templates per bug class (memory safety
+  first) and start testing them against these `.ll` files manually via
+  chat UI, since API access isn't set up yet.
