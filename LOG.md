@@ -251,3 +251,32 @@ One entry per session/action — used to track progress against `PLAN.md`.
   install Ghidra, decompile the stripped binaries to pseudo-C, then check
   whether a cleanup pass is actually needed before building one
   preemptively.
+
+## 2026-07-12 — Clarified: stripping vs. the actual "cleanup" problem
+
+- Went back to check whether the stripping decision (above) reopens the
+  need for PANGOLIN/FirmAgent-style cleanup, which was earlier deprioritized
+  on the assumption that debug symbols would be retained. Conclusion: these
+  are two separate issues, and stripping only affects one of them.
+  - **Stripping's effect**: loses readable variable/function names —
+    Ghidra will auto-generate placeholders (`local_1c`, `param_1`,
+    `iVar1`). This is expected and *not* something cleanup fixes — it's
+    an inherent, accepted property of analyzing a stripped binary (exactly
+    matching FirmAgent/PANGOLIN's real target binaries, which also never
+    had recoverable names). The LLM can still reason about generically
+    named variables; this is a readability cost being deliberately
+    accepted for realism, not a defect.
+  - **The actual cleanup problem** (opaque data-segment references
+    rendering as bare addresses instead of resolved string/constant
+    content; loop-based indirect-call dispatch tables rendering as
+    confusing loops instead of switch/case) is driven by what the code
+    *does*, not by whether it's stripped. A stripped binary with simple,
+    straightforward logic can still decompile cleanly on both fronts; a
+    symbol-rich binary with a dispatch table would have the same problem.
+- Since the 5 samples are small, self-contained functions with no
+  route-dispatch-style logic, the earlier plan still holds unchanged:
+  generate pseudo-C from the stripped binaries, read the actual output,
+  and only build cleanup tooling for the two specific problems above if
+  they actually appear — expect uglier variable names than hoped, but
+  that alone doesn't imply the full regex/data-resolution machinery is
+  needed.
