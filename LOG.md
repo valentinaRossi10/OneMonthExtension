@@ -197,3 +197,28 @@ One entry per session/action — used to track progress against `PLAN.md`.
   and resume Stage 3/4 on `W1/CVE-benchmark` with LLVM IR, or (b) compile
   the 5 samples to actual binaries and implement the chosen representation
   (angr/VEX, Ghidra/P-code, or Ghidra/pseudo-code + cleanup) here.
+
+## 2026-07-11 — Mentor's decision: decompiled pseudo-code, with IR/disassembly as fallback
+
+- Mentor's reply: start with **decompiled pseudo-code from the binary**
+  (matches option 4 / FirmAgent+PANGOLIN's paradigm). Explicit caveat:
+  some binaries use anti-decompilation techniques that cause the
+  decompiled pseudo-code to miss potentially vulnerable code — if that's
+  encountered, fall back to **IR or raw disassembly** for those cases.
+- Decision going forward: this branch (`W1/format-exploration`) is now the
+  active line of work — no need to switch back to `W1/CVE-benchmark`
+  unless a future case specifically forces a fallback to IR.
+- Implication for the pipeline: pseudo-code becomes the default
+  representation shown to the LLM, but the workflow should stay able to
+  regenerate IR (already have LLVM IR from Stage 2; VEX IR via angr and
+  Ghidra P-code are documented fallback options) or raw disassembly for
+  any sample where pseudo-code analysis fails or looks suspiciously
+  incomplete (e.g. missing/garbled logic around a known vulnerable
+  function).
+- Next: compile the existing 5 vulnerable/patched sample pairs to actual
+  binaries (same commits, same build-flag approach as Stage 2 but without
+  `-emit-llvm`), install/set up Ghidra, decompile each to pseudo-C, assess
+  whether a cleanup pass (data-segment resolution, etc., per
+  PANGOLIN/FirmAgent) is actually needed for these specific
+  functions before building one, then resume Stage 3/4 (prompt design +
+  manual benchmark) using pseudo-code as the primary input.
