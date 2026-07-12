@@ -17,7 +17,7 @@ Suggested models: to be confirmed with mentor (exact identifiers unclear as
 of writing — "GPT-5.6" / "Claude 5" need verifying against real API model
 names before use).
 
-## Update (2026-07-11): mentor reply changed the code-representation plan
+## Update (2026-07-12): mentor reply changed the code-representation plan
 
 The mentor sent 4 reference papers (FirmAgent, HermeScan, MANGODFA, PANGOLIN)
 and pointed to Ghidra/angr. Reading those papers surfaced a real design
@@ -46,8 +46,8 @@ project ultimately targets) ships stripped, with no variable/function
 names — decompiling an unstripped binary would hand the LLM human-chosen
 names (`addrs`, `dlist`) as a free hint unrelated to actual vulnerability
 reasoning, inflating results in a way that wouldn't transfer to real
-firmware. See `LOG.md` (2026-07-11 entries) for the full reasoning and the
-email exchange that led to this decision.
+firmware. See `LOG.md` (2026-07-11 and 2026-07-12 entries) for the full
+reasoning and the email exchange that led to this decision.
 
 ## Key clarification: two possible cases (original framing, superseded above)
 

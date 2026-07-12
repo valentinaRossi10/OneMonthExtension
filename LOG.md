@@ -198,7 +198,7 @@ One entry per session/action — used to track progress against `PLAN.md`.
   the 5 samples to actual binaries and implement the chosen representation
   (angr/VEX, Ghidra/P-code, or Ghidra/pseudo-code + cleanup) here.
 
-## 2026-07-11 — Mentor's decision: decompiled pseudo-code, with IR/disassembly as fallback
+## 2026-07-12 — Mentor's decision: decompiled pseudo-code, with IR/disassembly as fallback
 
 - Mentor's reply: start with **decompiled pseudo-code from the binary**
   (matches option 4 / FirmAgent+PANGOLIN's paradigm). Explicit caveat:
@@ -223,7 +223,7 @@ One entry per session/action — used to track progress against `PLAN.md`.
   functions before building one, then resume Stage 3/4 (prompt design +
   manual benchmark) using pseudo-code as the primary input.
 
-## 2026-07-11 — Methodology correction: strip binaries before decompiling
+## 2026-07-12 — Methodology correction: strip binaries before decompiling
 
 - Caught an issue before implementing: the plan to compile the 5 samples
   with debug symbols retained (`-g`) would give the LLM real, human-chosen
