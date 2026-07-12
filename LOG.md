@@ -222,3 +222,32 @@ One entry per session/action — used to track progress against `PLAN.md`.
   PANGOLIN/FirmAgent) is actually needed for these specific
   functions before building one, then resume Stage 3/4 (prompt design +
   manual benchmark) using pseudo-code as the primary input.
+
+## 2026-07-11 — Methodology correction: strip binaries before decompiling
+
+- Caught an issue before implementing: the plan to compile the 5 samples
+  with debug symbols retained (`-g`) would give the LLM real, human-chosen
+  variable/function names (`addrs`, `dlist`, `runCnt`) in the decompiled
+  pseudo-code. That's not representative of the actual problem — real
+  deployed IoT firmware (what FirmAgent and PANGOLIN both extract via
+  `binwalk`, and what this project ultimately targets) ships **stripped**
+  binaries with no debug info, which is exactly why those papers'
+  decompilers only recover generic names (`local_1c`, `iVar1`, `param_1`)
+  and why they needed extra LLM-refinement/regex cleanup steps in the
+  first place. Compiling with symbols retained would hand the LLM a hint
+  unrelated to actual vulnerability reasoning and inflate detection
+  numbers in a way that wouldn't transfer to real firmware.
+- Decision: compile the 5 samples normally, then **strip** the resulting
+  binaries (`strip <binary>`) before decompiling with Ghidra, matching
+  real firmware conditions and FirmAgent/PANGOLIN's actual setup. This
+  is now the default/primary pipeline.
+- Noted as a possible secondary experiment (not a replacement for the
+  above): also decompiling the *unstripped* versions and comparing
+  detection accuracy against the stripped versions would isolate how much
+  naming/symbol information affects LLM-based detection — a measurement
+  neither FirmAgent nor PANGOLIN isolated. Worth doing only after the
+  primary (stripped) benchmark is working.
+- Next: proceed with compiling all 5 samples to binaries, `strip` each,
+  install Ghidra, decompile the stripped binaries to pseudo-C, then check
+  whether a cleanup pass is actually needed before building one
+  preemptively.

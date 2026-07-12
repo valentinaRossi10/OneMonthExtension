@@ -17,7 +17,39 @@ Suggested models: to be confirmed with mentor (exact identifiers unclear as
 of writing — "GPT-5.6" / "Claude 5" need verifying against real API model
 names before use).
 
-## Key clarification: two possible cases
+## Update (2026-07-11): mentor reply changed the code-representation plan
+
+The mentor sent 4 reference papers (FirmAgent, HermeScan, MANGODFA, PANGOLIN)
+and pointed to Ghidra/angr. Reading those papers surfaced a real design
+question: they split into two paradigms — deterministic static analysis on
+raw IR (HermeScan/MANGODFA, via angr/VEX, no LLM) vs. LLM-driven reasoning
+on **decompiled pseudo-code** (FirmAgent/PANGOLIN, via IDA Pro). Since this
+project's design uses an LLM as the analysis engine, the pseudo-code
+paradigm is the closer precedent — confirmed by the mentor's reply:
+
+> "You can start with the decompiled pseudo-code from the binary. Since
+> binaries may adopt various strategies to thwart decompilation, the
+> decompiled pseudo-code may miss some potentially vulnerable code. If you
+> encounter such cases, you could revert to using IR or even disassembly
+> code."
+
+**This supersedes the original "convert firmware to LLVM IR" framing below.**
+Decompiled pseudo-code (via Ghidra) is now the primary representation shown
+to the LLM; LLVM IR (already generated in Stage 2), VEX IR (angr), Ghidra
+P-code, or raw disassembly are documented fallbacks for cases where
+pseudo-code analysis misses a known-vulnerable pattern.
+
+A related methodology correction: the binaries must be **stripped** before
+decompiling (`strip <binary>`), not compiled with debug symbols retained.
+Real deployed firmware (what FirmAgent/PANGOLIN analyze, and what this
+project ultimately targets) ships stripped, with no variable/function
+names — decompiling an unstripped binary would hand the LLM human-chosen
+names (`addrs`, `dlist`) as a free hint unrelated to actual vulnerability
+reasoning, inflating results in a way that wouldn't transfer to real
+firmware. See `LOG.md` (2026-07-11 entries) for the full reasoning and the
+email exchange that led to this decision.
+
+## Key clarification: two possible cases (original framing, superseded above)
 
 "Convert firmware to LLVM IR" is not a single well-defined step — it depends
 on what form the firmware takes:
@@ -30,9 +62,9 @@ on what form the firmware takes:
   binary. This is lossy and architecture-dependent (ARM/MIPS common in IoT),
   and is a nontrivial task on its own.
 
-Since nothing has been received from the mentor yet, this plan covers both
-cases, and sequences work so that progress doesn't block on which case
-applies.
+This framing is kept for history; per the mentor's reply above, decompiled
+pseudo-code (Ghidra) is now the primary route for binary-only samples,
+rather than binary-lifting straight to LLVM IR.
 
 ## Environment
 
@@ -88,24 +120,39 @@ of invoking clang directly on one file.
 
 Output goes in `ir/`.
 
-## Stage 3 — Firmware, once received
+## Stage 3 — Compile samples to stripped binaries, decompile to pseudo-code
 
-Determine which case applies (source vs binary-only) and proceed
-accordingly:
+Applies to the 5 existing vulnerable/patched CVE samples now (not waiting on
+firmware — see Update above). For real firmware, once received, the same
+pipeline applies: extract with `binwalk -e firmware.bin`, identify
+architecture (`file <extracted_binary>`), then decompile directly (no
+compile step needed, it's already a binary).
 
-**Case A (source):** reuse Stage 2.
+For the CVE samples:
+1. Compile each vulnerable/patched version normally to a binary (same
+   commits/build-flag approach as Stage 2, but without `-emit-llvm`).
+2. **Strip debug symbols**: `strip <binary>` — mandatory, not optional (see
+   Update above for why: matches real firmware, avoids handing the LLM
+   human-chosen variable names as a free hint).
+3. Install Ghidra, decompile each stripped binary to pseudo-C (headless
+   analyzer + a decompiler script — see `LOG.md` for the specific API
+   calls).
+4. Inspect the pseudo-C output manually before building any cleanup
+   tooling — with only 5 small, known functions, check by eye whether the
+   output is already LLM-readable (likely yes, per PANGOLIN/FirmAgent's
+   documented cleanup needs being driven by *large-scale, complex*
+   binaries, not small isolated functions). Only build a
+   regex/normalization cleanup pass (PANGOLIN-style) or an LLM refinement
+   step (FirmAgent-style) if specific problems actually show up.
+5. Fallback path (per mentor's guidance): if a sample's decompiled
+   pseudo-code looks like it's missing or garbling the known-vulnerable
+   logic (anti-decompilation effects), fall back to that sample's LLVM IR
+   (already have it) or generate VEX IR (angr) / raw disassembly instead,
+   and note this per-sample in `info.md`.
 
-**Case B (binary):**
-1. Extract: `binwalk -e firmware.bin`
-2. Identify architecture: `file <extracted_binary>`
-3. Lift to LLVM IR with RetDec first (lowest setup cost); fall back to
-   McSema/Remill only if RetDec proves insufficient.
-
-Recommendation: prioritize Stages 1-2 and get a working source-based
-benchmark before investing time in binary lifting, since lifting is the
-hardest and least certain part of the pipeline.
-
-Output goes in `firmware/` (raw/extracted, not committed to git) and `ir/`.
+Output goes in `pseudo-code/<sample-name>/{vulnerable,patched}.c` (new
+folder, mirroring the `ir/` structure), keeping `ir/` as the fallback
+reference.
 
 ## Stage 4 — Prompt design per vulnerability class
 
@@ -114,9 +161,15 @@ overflow, use-after-free, double-free; expand to integer overflow, format
 string, etc. later).
 
 Each template should:
-- Name the specific IR-level pattern to look for (e.g. unchecked
-  `getelementptr` offsets, `memcpy`/`strcpy` calls without bounds checks).
-- Take `.ll` IR as input; test IR-only vs IR+source as a variable.
+- Take **decompiled pseudo-C as the primary input** (per mentor's
+  decision), with LLVM IR/VEX IR/disassembly available as a fallback input
+  for samples where pseudo-code is insufficient.
+- Name the specific pattern to look for per bug class in pseudo-C terms
+  (e.g. size/allocation arithmetic without a bounds check, a pointer used
+  after a `free`-equivalent call, a signed/unsigned mismatch feeding an
+  allocation size) — analogous to, but adapted from, the earlier
+  IR-level patterns (unchecked `getelementptr` offsets,
+  `memcpy`/`strcpy` calls without bounds checks).
 - Request structured output (vulnerable yes/no, function/line, bug class,
   confidence, short reasoning) for easy scoring.
 
@@ -125,8 +178,10 @@ Output goes in `prompts/`.
 ## Stage 5 — Run the benchmark
 
 No API access yet, so run manually:
-1. Paste each `ir/*.ll` sample into the chat UI (claude.ai / chatgpt.com)
-   with each relevant prompt template.
+1. Paste each `pseudo-code/*.c` sample into the chat UI (claude.ai /
+   chatgpt.com) with each relevant prompt template. For any sample using
+   the IR fallback, paste the corresponding `ir/*.ll` file instead and
+   note this in the results.
 2. Save raw output in `results/runs/`.
 3. Score against `samples/index.csv` (hit / miss / false positive) in
    `results/scoring.csv`.
@@ -144,10 +199,16 @@ the hybrid approach.
 Script Stages 4-5 with the Anthropic/OpenAI SDKs (`scripts/run_benchmark.py`,
 `scripts/score.py`) to loop over samples x templates x models automatically.
 
-## Immediate next actions (this week, unblocked by firmware)
+## Immediate next actions
 
-1. Stage 0: environment setup.
-2. Stage 1: pick 3-5 CVEs, pull vulnerable source, log in `samples/index.csv`.
-3. Stage 2: generate `.ll` files for each sample.
-4. Confirm with mentor: exact model names/versions, and whether Case A or
-   Case B applies to the firmware he'll send.
+1. ~~Stage 0: environment setup.~~ Done.
+2. ~~Stage 1: pick 3-5 CVEs, pull vulnerable source, log in
+   `samples/index.csv`.~~ Done — 5 samples, 5 memory-safety CWE classes.
+3. ~~Stage 2: generate `.ll` files for each sample.~~ Done — all 5 samples
+   have verified vulnerable/patched LLVM IR pairs in `ir/`.
+4. Stage 3 (current): compile the 5 samples to binaries, strip them,
+   install Ghidra, decompile to pseudo-C, check if cleanup is actually
+   needed.
+5. Still to confirm with mentor: exact model names/versions for the
+   benchmark (raised in earlier email, not yet answered — his reply so far
+   only addressed the code-representation question).
