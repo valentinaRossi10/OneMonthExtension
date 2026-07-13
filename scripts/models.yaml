@@ -1,0 +1,18 @@
+# Models to benchmark. Add/remove entries as needed.
+#
+# provider: "anthropic" or "openai" — selects which SDK client run_benchmark.py uses.
+# model: the exact API model ID.
+#
+# NOTE: exact model names/versions still need confirming with the mentor
+# (raised in the email about API access — see LOG.md). The Anthropic IDs
+# below are current as of this project's Claude Code environment; the
+# OpenAI one is a placeholder — replace with the confirmed model ID before
+# running.
+
+models:
+  - provider: anthropic
+    model: claude-sonnet-5
+  - provider: anthropic
+    model: claude-opus-4-8
+  - provider: openai
+    model: REPLACE_ME_CONFIRM_WITH_MENTOR

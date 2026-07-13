@@ -311,3 +311,135 @@ One entry per session/action — used to track progress against `PLAN.md`.
   analyzer + decompiler script), then inspect the output by eye before
   deciding whether any cleanup pass is actually needed (per the 2026-07-12
   clarification above).
+
+## 2026-07-13 — Diagnosed and started fixing a relocation bug in Stage 3's binaries
+
+- While trying Ghidra on the stripped `man_main` object, the decompiler
+  output was heavily garbled (warnings like "Removing unreachable block",
+  "Read-only address is written"). `readelf -r` showed the stripped `.o`
+  had **zero relocation entries**. Root cause: the Stage 3 binaries were
+  compiled but never *linked* — they're relocatable objects (`.o`, ELF
+  type `ET_REL`) whose call targets and data references are only resolved
+  at link time via relocations. Stripping an unlinked `.o` destroys the
+  symbol table those relocations depend on, but since linking never
+  happened, the addresses were never resolved either — Ghidra was handed
+  garbage placeholder bytes instead of real instructions.
+- Fix: build the **full linked BusyBox executable** per commit (real
+  `make`, not a single-file compile), then strip *that* — safe, because by
+  link time all relocations are already resolved into real addresses; only
+  symbol names disappear, not the instructions.
+- Branched to `W1/linked-binaries` to do this rebuild, keeping
+  `W1/CVE-benchmark`'s Stage 3 output untouched in case this direction
+  needs reverting.
+- Hit two more build issues in the full-BusyBox build (unrelated to any of
+  the 5 samples): `networking/tc.c` fails against modern kernel headers
+  (missing legacy CBQ traffic-control structs) — fixed by disabling
+  `CONFIG_TC`; `rdate`/`date` fail with undefined reference to `stime()`
+  (removed from glibc) for the bunzip2 commits specifically.
+- Rather than keep disabling individual broken legacy applets one at a
+  time on top of `make defconfig` (which builds every applet, slow and
+  fragile), switched to a **minimal config**: `make allnoconfig` plus
+  enabling only the ~5 applets each sample actually needs
+  (`CONFIG_BUNZIP2`, `CONFIG_BZCAT`, `CONFIG_UNLZMA`, `CONFIG_AWK`,
+  `CONFIG_MAN`, `CONFIG_UDHCPC6`). Confirmed this works: the two bunzip2
+  builds redone this way produced valid, much smaller binaries (~128KB vs
+  ~1.2MB under defconfig) with `get_next_block` present in both.
+- All 10 full linked binaries now build successfully. Still to do:
+  `strip --strip-all` each one, re-check/re-apply the
+  `-ffunction-sections` section-rename fix from the earlier Stage 3 entry
+  (BusyBox still compiles with that flag, so linked binaries likely have
+  the same per-function section-name leak), verify clean with `nm`/
+  `strings`, then copy into `binaries/` replacing the old broken `.o`
+  files and update `binaries/README.md`.
+
+## 2026-07-13 — Finished the linked-binary rebuild; Stage 3 binaries done
+
+- The scratchpad holding the first 10 linked binaries was wiped between
+  sessions (this has happened before), so the rebuild had to start over.
+  Only one sample (CVE-2026-29004) had its exact commit SHAs recorded in
+  `info.md`; re-derived the other 4 samples' exact vulnerable/fixing
+  commits by pickaxe-searching BusyBox's full git history for unique code
+  fragments from each sample's already-saved source, then confirmed every
+  vulnerable/patched pair byte-for-byte matches what's already committed
+  in `samples/` before rebuilding — all 4 matched exactly, so the rebuild
+  targets the same ground truth as before, just re-derived from history
+  instead of a saved note.
+- Rebuilt all 10 with the minimal-config approach from the previous
+  entry, this time adding an automated check: after each build, `nm` on
+  BusyBox's own unstripped intermediate (`busybox_unstripped`) to confirm
+  the sample's target function actually made it into the binary (or, for
+  CVE-2021-42386's patched build, confirm `nvalloc` is correctly absent,
+  same exception as the Stage 2 IR check).
+- That check caught a real bug on the first rebuild attempt: two binaries
+  (the CVE-2026-29004 pair) built "successfully" with no errors but were
+  completely missing `option_to_env` — the whole `udhcpc6` applet hadn't
+  been compiled in. Root cause: `CONFIG_UDHCPC6` depends on
+  `CONFIG_FEATURE_IPV6`, which `allnoconfig` disables by default; simply
+  enabling `CONFIG_UDHCPC6=y` in `.config` without also enabling its
+  dependency silently produced a binary without the applet at all, no
+  build failure to signal it. This is exactly the kind of silent failure
+  the automated `nm` check exists to catch — without it, this could have
+  gone unnoticed all the way into a garbled/empty Ghidra decompilation
+  and wasted more time misdiagnosed as another Ghidra-side issue. Fixed
+  by also enabling `CONFIG_FEATURE_IPV6=y`; reran and all 10 builds now
+  pass the per-function verification.
+- Confirmed BusyBox's own build system already links `busybox_unstripped`
+  down to a stripped `busybox` as its final step (no separate strip
+  needed), and that a fully linked executable doesn't have the earlier
+  `-ffunction-sections` section-name leak at all — the linker coalesces
+  all per-function `.text.<fn>` sections from the individual `.o` files
+  into a single `.text` section in the final binary. Ran `strip
+  --strip-all` again anyway for clarity/documentation. Verified all 10
+  clean via `nm` (no symbols), `readelf -S` (no per-function sections),
+  and `strings` (no target function names or source filenames anywhere).
+- Replaced the old broken unlinked-and-stripped `.o` files in `binaries/`
+  with these 10 verified linked-and-stripped executables
+  (`binaries/<sample>/{vulnerable,patched}`, no `.o` extension since
+  they're now real executables, not objects). Updated `binaries/README.md`
+  to describe the corrected pipeline and both bugs caught along the way.
+- **Stage 3 is now complete and correct.** Next: install/use Ghidra to
+  decompile these 10 binaries to pseudo-C, producing
+  `pseudo-code/<sample>/{vulnerable,patched}.c` for the Stage 4/5
+  automation scripts (`scripts/run_benchmark.py` already looks for these
+  first, falling back to `ir/` if absent).
+
+## 2026-07-13 — Stage 4-5: built prompt templates and benchmark automation scripts
+
+- Built ahead of having API keys, per explicit decision to start on the
+  "full matrix" automated version now (all samples × all bug-class
+  prompts × all configured models) rather than waiting for keys or
+  building a minimal single-model version first.
+- `prompts/`: one template per bug class, covering all 5 memory-safety
+  classes in `samples/index.csv` (`memory-buffer-overflow.md`,
+  `memory-use-after-free.md`, `memory-integer-overflow.md`,
+  `memory-null-pointer-dereference.md`, `memory-out-of-bounds-read.md`).
+  Each names the specific pseudo-C-level pattern for its bug class, states
+  what *not* to flag (to keep cross-template scoring clean), and requests
+  a structured, regex-parseable response format.
+- `scripts/run_benchmark.py`: for every sample × variant
+  (vulnerable/patched) × model in `scripts/models.yaml`, finds
+  `pseudo-code/<sample>/<variant>.c` if it exists (primary representation)
+  else falls back to `ir/<sample>/<variant>.ll`, builds the matching
+  prompt, calls the Anthropic or OpenAI SDK, and saves raw output to
+  `results/runs/<cve_id>__<variant>__<model>.md`.
+- `scripts/score.py`: parses every file under `results/runs/`, extracts
+  the `Vulnerable: yes/no` line, compares against the expected verdict
+  (yes for vulnerable, no for patched), writes `results/scoring.csv`
+  (cve_id, bug_class, model, variant, expected, actual, hit,
+  false_positive), and prints overall accuracy.
+- `scripts/models.yaml`: lists models to benchmark — `claude-sonnet-5` and
+  `claude-opus-4-8` on the Anthropic side; the OpenAI side is a
+  placeholder (`REPLACE_ME_CONFIRM_WITH_MENTOR`) pending mentor
+  confirmation of the exact model ID (question raised in an earlier email,
+  still unanswered). `run_benchmark.py` skips placeholder entries with a
+  warning instead of failing.
+- Updated `scripts/README.md`, `prompts/README.md`, `results/README.md`
+  to match what actually got built (they previously described an
+  IR-centric, manual-only workflow left over from before the mentor's
+  pseudo-code decision), and added API key setup instructions
+  (Anthropic console / OpenAI platform key pages, `ANTHROPIC_API_KEY` /
+  `OPENAI_API_KEY` env vars) since no keys are configured yet.
+- Not yet run end-to-end: no API keys configured yet, and `pseudo-code/`
+  doesn't exist yet (blocked on finishing the linked-binaries rebuild
+  above), so a real run today would silently use the `ir/` fallback for
+  all 5 samples.

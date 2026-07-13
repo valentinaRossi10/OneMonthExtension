@@ -70,8 +70,9 @@ rather than binary-lifting straight to LLVM IR.
 
 - Linux (native or VM)
 - New to LLVM/binary analysis tooling — plan assumes a learning ramp-up
-- No LLM API access yet — Stage 4/5 done manually via chat UI until keys are
-  available
+- No LLM API access yet — Stage 4/5 are scripted and ready to go (see
+  `scripts/`), just waiting on keys (see "Getting API access" under
+  Stage 5)
 
 ## Stage 0 — Environment setup
 
@@ -120,7 +121,7 @@ of invoking clang directly on one file.
 
 Output goes in `ir/`.
 
-## Stage 3 — Compile samples to stripped binaries, decompile to pseudo-code
+## Stage 3 — Compile samples to stripped binaries, decompile to pseudo-code (compile+strip done)
 
 Applies to the 5 existing vulnerable/patched CVE samples now (not waiting on
 firmware — see Update above). For real firmware, once received, the same
@@ -154,37 +155,66 @@ Output goes in `pseudo-code/<sample-name>/{vulnerable,patched}.c` (new
 folder, mirroring the `ir/` structure), keeping `ir/` as the fallback
 reference.
 
-## Stage 4 — Prompt design per vulnerability class
+## Stage 4 — Prompt design per vulnerability class (done — see `prompts/`)
 
-Build one prompt template per bug class (start with memory safety: buffer
-overflow, use-after-free, double-free; expand to integer overflow, format
-string, etc. later).
+Built one prompt template per bug class, covering all 5 memory-safety
+classes currently in `samples/index.csv`: `memory-buffer-overflow.md`,
+`memory-use-after-free.md`, `memory-integer-overflow.md`,
+`memory-null-pointer-dereference.md`, `memory-out-of-bounds-read.md`.
 
-Each template should:
-- Take **decompiled pseudo-C as the primary input** (per mentor's
-  decision), with LLVM IR/VEX IR/disassembly available as a fallback input
-  for samples where pseudo-code is insufficient.
-- Name the specific pattern to look for per bug class in pseudo-C terms
+Each template:
+- Takes **decompiled pseudo-C as the primary input** (per mentor's
+  decision), with a fallback note prepended when a sample instead uses
+  LLVM IR (pseudo-code not yet generated, or per-sample fallback per
+  Stage 3 step 5).
+- Names the specific pattern to look for per bug class in pseudo-C terms
   (e.g. size/allocation arithmetic without a bounds check, a pointer used
   after a `free`-equivalent call, a signed/unsigned mismatch feeding an
-  allocation size) — analogous to, but adapted from, the earlier
-  IR-level patterns (unchecked `getelementptr` offsets,
-  `memcpy`/`strcpy` calls without bounds checks).
-- Request structured output (vulnerable yes/no, function/line, bug class,
-  confidence, short reasoning) for easy scoring.
+  allocation size), and explicitly states what *not* to flag so scoring
+  stays clean across templates.
+- Requests structured output (vulnerable yes/no, function/line, bug class,
+  confidence, short reasoning) — see `prompts/README.md` for the exact
+  format `scripts/score.py` parses.
 
-Output goes in `prompts/`.
+`scripts/run_benchmark.py` maps each sample's `bug_class` column to the
+matching template automatically.
 
-## Stage 5 — Run the benchmark
+## Stage 5 — Run the benchmark (scripted — see `scripts/`)
 
-No API access yet, so run manually:
-1. Paste each `pseudo-code/*.c` sample into the chat UI (claude.ai /
-   chatgpt.com) with each relevant prompt template. For any sample using
-   the IR fallback, paste the corresponding `ir/*.ll` file instead and
-   note this in the results.
-2. Save raw output in `results/runs/`.
-3. Score against `samples/index.csv` (hit / miss / false positive) in
-   `results/scoring.csv`.
+`scripts/run_benchmark.py` and `scripts/score.py` were built ahead of
+receiving API keys, so the pipeline is ready to run as soon as they're
+set up:
+
+1. `run_benchmark.py` loops over every sample × variant
+   (vulnerable/patched) × model configured in `scripts/models.yaml`,
+   builds the matching prompt (pseudo-code if available, else IR
+   fallback), calls the model, and saves raw output to
+   `results/runs/<cve_id>__<variant>__<model>.md`.
+2. `score.py` parses every run, extracts the `Vulnerable: yes/no`
+   verdict, compares it against the expected answer, and writes
+   `results/scoring.csv` plus an overall accuracy summary.
+
+See `scripts/README.md` for setup instructions and `results/README.md`
+for output format. Manual chat-UI runs are still fine for one-off spot
+checks but are no longer the default path.
+
+### Getting API access
+
+- **Anthropic**: sign in at https://console.anthropic.com/, add billing,
+  generate a key under Settings → API Keys, export as
+  `ANTHROPIC_API_KEY`.
+- **OpenAI**: sign in at https://platform.openai.com/, add billing,
+  generate a key at https://platform.openai.com/api-keys, export as
+  `OPENAI_API_KEY`.
+- `scripts/models.yaml` already has the Anthropic models filled in
+  (`claude-sonnet-5`, `claude-opus-4-8`). The OpenAI entry is a
+  placeholder (`REPLACE_ME_CONFIRM_WITH_MENTOR`) — still need to confirm
+  the exact model ID with the mentor (raised in an earlier email, not yet
+  answered); `run_benchmark.py` skips placeholder entries with a warning
+  rather than failing.
+- Once keys are exported: `pip install -r scripts/requirements.txt`, then
+  run `python3 scripts/run_benchmark.py` followed by
+  `python3 scripts/score.py`.
 
 ## Stage 6 — Analyze and write up
 
@@ -194,11 +224,6 @@ whether IR-only is sufficient or source context is needed. This comparison
 is the actual deliverable for this stage and motivates the next phase of
 the hybrid approach.
 
-## Optional — automation (once API access exists)
-
-Script Stages 4-5 with the Anthropic/OpenAI SDKs (`scripts/run_benchmark.py`,
-`scripts/score.py`) to loop over samples x templates x models automatically.
-
 ## Immediate next actions
 
 1. ~~Stage 0: environment setup.~~ Done.
@@ -206,9 +231,17 @@ Script Stages 4-5 with the Anthropic/OpenAI SDKs (`scripts/run_benchmark.py`,
    `samples/index.csv`.~~ Done — 5 samples, 5 memory-safety CWE classes.
 3. ~~Stage 2: generate `.ll` files for each sample.~~ Done — all 5 samples
    have verified vulnerable/patched LLVM IR pairs in `ir/`.
-4. Stage 3 (current): compile the 5 samples to binaries, strip them,
-   install Ghidra, decompile to pseudo-C, check if cleanup is actually
-   needed.
-5. Still to confirm with mentor: exact model names/versions for the
-   benchmark (raised in earlier email, not yet answered — his reply so far
-   only addressed the code-representation question).
+4. ~~Stage 3: compile the 5 samples to binaries, strip them.~~ Done — all
+   5 samples have verified vulnerable/patched linked+stripped executables
+   in `binaries/` (see `LOG.md` for the relocation-bug and
+   `FEATURE_IPV6` dependency bugs caught and fixed along the way). Next:
+   install Ghidra, decompile to `pseudo-code/`, check whether cleanup is
+   actually needed.
+5. ~~Stage 4: build prompt templates per bug class.~~ Done — see
+   `prompts/`.
+6. ~~Stage 5: script the benchmark runner + scorer.~~ Done — see
+   `scripts/`. Not yet actually run (no API keys configured yet); will
+   fall back to `ir/` for all samples until `pseudo-code/` exists.
+7. Still to confirm with mentor: exact OpenAI model ID for the benchmark
+   (raised in earlier email, not yet answered — his reply so far only
+   addressed the code-representation question).

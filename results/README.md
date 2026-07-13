@@ -5,21 +5,24 @@ LLM outputs and scoring against the ground truth in `samples/index.csv`.
 ```
 results/
 ├── runs/
-│   └── <sample>__<model>__<prompt-template>.md   # raw LLM response
+│   └── <cve_id>__<variant>__<model>.md   # raw LLM response, one per run
 └── scoring.csv
 ```
 
+`<variant>` is `vulnerable` or `patched`.
+
 ## scoring.csv columns
 
-`cve_id, model, prompt_template, hit (yes/no), false_positive (yes/no),
-notes`
+`cve_id, bug_class, model, variant, expected, actual, hit, false_positive`
 
-## Workflow (manual, until API access is set up)
+## Workflow (automated, via scripts/)
 
-1. Take a generated `.ll` file from `ir/`.
-2. Paste it into the chat UI (claude.ai / chatgpt.com) using a template from
-   `prompts/`.
-3. Save the raw response under `results/runs/`.
-4. Score it against `samples/index.csv` and log the row in `scoring.csv`.
+1. Set up API keys (see `scripts/README.md`).
+2. `python3 scripts/run_benchmark.py` — runs every sample × variant ×
+   configured model, saves raw output here under `runs/`.
+3. `python3 scripts/score.py` — parses `runs/`, compares against
+   `samples/index.csv`, writes `scoring.csv` and prints overall accuracy.
 
-Once API keys are available, this loop can be scripted — see `scripts/README.md`.
+This replaces the earlier manual chat-UI workflow (paste `.ll`/`.c` into
+claude.ai / chatgpt.com by hand) now that the scripts exist — manual
+runs are still fine for one-off spot checks.

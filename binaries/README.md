@@ -1,32 +1,61 @@
 # binaries/
 
-Compiled, stripped ELF relocatable object files for each sample, one
-`vulnerable.o` / `patched.o` pair per CVE, mirroring `samples/` and `ir/`.
+Compiled, linked, stripped ELF executables for each sample, one
+`vulnerable` / `patched` pair per CVE, mirroring `samples/` and `ir/`.
 
 These are the input to Stage 3's decompilation step (Ghidra) — see
 `PLAN.md` and `LOG.md` for the full pipeline and reasoning.
 
 ## How these were produced
 
-1. Compiled normally from the same vulnerable/patched commits used for
-   `samples/` and `ir/`, using BusyBox's own build flags (captured via
-   `make V=1 <file>.o`), producing a real ELF relocatable object
-   (`gcc ... -c -o file.o file.c` — no `-emit-llvm`).
-2. Stripped all symbols: `strip --strip-all file.o`.
-3. Anonymized per-function section names: BusyBox compiles with
-   `-ffunction-sections`, so each function gets its own section
-   (e.g. `.text.option_to_env`) — `strip --strip-all` removes the symbol
-   table but does **not** remove these section names, which would
-   otherwise leak the vulnerable function's name straight through
-   stripping. Renamed every `.text.<fn>` / `.data.<fn>` / `.rodata.<fn>`
-   section back to its generic form (`.text`, `.data`, `.rodata`) with
-   `objcopy --rename-section`.
-4. Verified with `nm` (no symbols) and `strings` (no target function names
-   anywhere in the file) that no sample leaks which function is the
-   vulnerable one before it even reaches Ghidra.
+1. Built the **full linked BusyBox executable** at each sample's
+   vulnerable/patched commit — not a single-file compile. This matters:
+   an earlier attempt compiled each sample's `.c` file alone into an
+   unlinked relocatable object (`.o`) and stripped that directly, which
+   destroys the object's relocation table before it was ever resolved
+   (relocations only get resolved at link time), leaving Ghidra with
+   garbage placeholder bytes instead of real call targets. Building and
+   linking the full executable first means all relocations are already
+   resolved to real addresses by the time anything gets stripped. See the
+   2026-07-13 "relocation bug" entry in `LOG.md` for the full diagnosis.
+2. Used a **minimal config** (`make allnoconfig` plus only the ~6 applets
+   the 5 samples actually need: `CONFIG_BUNZIP2`, `CONFIG_BZCAT`,
+   `CONFIG_UNLZMA`, `CONFIG_AWK`, `CONFIG_MAN`, `CONFIG_UDHCPC6` +
+   `CONFIG_FEATURE_IPV6`, which `CONFIG_UDHCPC6` depends on) rather than
+   `make defconfig` — much faster, and avoids several legacy-applet build
+   failures against modern kernel/glibc headers that are unrelated to any
+   of the 5 samples (e.g. `networking/tc.c` needing removed kernel CBQ
+   structs, `date`/`rdate` needing the removed `stime()` syscall).
+3. Verified via `nm` on the **unstripped** intermediate
+   (`busybox_unstripped`, which BusyBox's own build produces before its
+   own final strip step) that each sample's target function
+   (`option_to_env`, `nvalloc`, `get_next_block`, `man_main`,
+   `unpack_lzma_stream`) actually made it into the binary — not
+   optimized away or (for the CVE-2021-42386 patched build) confirmed
+   correctly **absent**, since that fix removes `nvalloc` entirely. This
+   caught a real bug during the rebuild: `CONFIG_UDHCPC6` silently
+   depends on `CONFIG_FEATURE_IPV6`, which `allnoconfig` disables by
+   default, so the first rebuild attempt produced two binaries missing
+   `option_to_env` (and the whole udhcpc6 applet) entirely without any
+   build error.
+4. BusyBox's own build system already links `busybox_unstripped` down to
+   a stripped `busybox` binary as its last step — no separate strip pass
+   was actually needed. Ran `strip --strip-all` again anyway as an
+   explicit, documented step. Confirmed via `nm` (no symbols) and
+   `readelf -S` that, unlike the earlier unlinked-`.o` attempt, a fully
+   linked executable's per-function `-ffunction-sections` sections get
+   coalesced by the linker into single `.text`/`.data`/`.rodata` sections
+   — so the earlier section-name leak (`.text.<fn>` surviving `strip`)
+   does not apply here; no `objcopy --rename-section` step is needed for
+   linked binaries.
+5. Verified with `strings` across all 10 files that no target function
+   name, or any other sample-identifying source filename, appears
+   anywhere in the binary.
 
-This matters because these object files stand in for real, deployed
-firmware binaries, which ship stripped — the whole point of stripping here
-is to avoid handing the LLM information (names) it wouldn't have on a real
-target. See `LOG.md` (2026-07-12 methodology correction entry) for why this
-was necessary.
+This matters because these binaries stand in for real, deployed firmware
+binaries, which ship linked and stripped — the whole point of stripping
+here is to avoid handing the LLM information (names) it wouldn't have on
+a real target. See `LOG.md` (2026-07-12 methodology correction entry) for
+why stripping is necessary, and the 2026-07-13 entries for the
+relocation-bug fix and the udhcpc6/`FEATURE_IPV6` bug caught during the
+rebuild.
