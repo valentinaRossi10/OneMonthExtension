@@ -443,3 +443,52 @@ One entry per session/action — used to track progress against `PLAN.md`.
   doesn't exist yet (blocked on finishing the linked-binaries rebuild
   above), so a real run today would silently use the `ir/` fallback for
   all 5 samples.
+
+## 2026-07-13 — Manual Ghidra decompilation: workflow and first 3 samples
+
+- Started manually decompiling the 10 binaries in `binaries/` with
+  Ghidra's GUI (`CodeBrowser`), one function at a time, per the pipeline
+  documented in `pseudo-code/README.md` (new file).
+- Locating each target function in a stripped binary needed different
+  techniques per sample, since there are no symbol names to search for:
+  - **String-literal anchor** (fastest, used for `man_main`,
+    `unpack_lzma_stream`, `nvfree`): search for a string used nowhere else
+    in the source but inside the target function (e.g.
+    `"MANDATORY_MANPATH"`, `"bad lzma header"`, `"Internal error"`), then
+    follow Ghidra's XREF from the string to its calling function.
+  - **Shared-global-reference chaining** (used for `nvalloc`, which has no
+    strings of its own): found `nvfree` via its unique string first, then
+    located `nvalloc` by checking which nearby function shares the same
+    global block-list state and matches the expected shape (single `int`
+    parameter, loop over `pos`/`size`/`nv` arithmetic, conditional
+    allocation, zeroing loop) — confirmed against the real source's struct
+    math (`MINNVBLOCK` = 64 = `0x40` showing up as the exact immediate
+    constant in the decompiled comparison).
+  - Address-adjacency (assuming the compiler kept source-order layout) was
+    tried first for `nvalloc` and **failed** — the function immediately
+    before `nvfree` by address turned out to be an unrelated helper, not
+    `nvalloc`. Not a reliable heuristic on its own; only used the
+    structural/reference-based checks above as ground truth.
+  - Several functions weren't recognized as functions by Ghidra's
+    auto-analysis at all (shown as `LAB_...`/decompiled ad-hoc as
+    `UndefinedFunction_<addr>` instead of `FUN_...`) — fixed per-function
+    with `Create Function` at the correct address once located via the
+    Listing view.
+- Saved and verified 3 of 5 samples so far, confirming the known fix is
+  visible in each vulnerable/patched decompiled diff:
+  - `CVE-2021-42373` (`man_main`): fix shows up as an added
+    `|| (plVar12[1] == 0)` condition — matches the real `&& argv[1]` fix.
+  - `CVE-2021-42374` (`unpack_lzma_stream`): fix shows up as a re-check
+    `(int)pos < 0` added after the adjustment, jumping to the
+    `"corrupted data"` error path if still negative — matches the real
+    fix exactly.
+  - `CVE-2021-42386` (`nvalloc`): **vulnerable side only, intentionally.**
+    The fix removes `nvalloc`/`nvfree` entirely rather than patching them,
+    so there is no equivalent "patched `nvalloc`" to decompile. Documented
+    in detail in `pseudo-code/README.md`. `scripts/run_benchmark.py`
+    already handles this correctly via its existing IR-fallback logic —
+    it'll use `ir/CVE-2021-42386-busybox/patched.ll` for that variant
+    automatically, no script changes needed.
+- Remaining: `get_next_block` (bunzip2, CVE-2017-15873) and
+  `option_to_env` (udhcpc6, CVE-2026-29004) — both need the
+  size-sort/call-graph approach since neither has a usable string anchor.
