@@ -492,3 +492,65 @@ One entry per session/action — used to track progress against `PLAN.md`.
 - Remaining: `get_next_block` (bunzip2, CVE-2017-15873) and
   `option_to_env` (udhcpc6, CVE-2026-29004) — both need the
   size-sort/call-graph approach since neither has a usable string anchor.
+
+## 2026-07-13 — Sample 4 done (get_next_block); found a real bug in sample 5's binaries
+
+- `CVE-2017-15873` (`get_next_block`, bunzip2): located via `Window →
+  Functions` sorted by size, confirmed unambiguously by the presence of
+  bzip2's actual magic numbers (`0x177245`/`0x385090` = digits of √2,
+  `0x314159`/`0x265359` = digits of π, used for end-of-stream/new-block
+  markers) and by finding the exact vulnerable bounds check
+  (`if (iVar17 < iVar6 + local_774) goto ...`, matching
+  `dbufCount + runCnt > dbufSize`) with both operands declared `int`. The
+  patched version's fix is clearly visible: the same check becomes an
+  explicit `(uint)` comparison, with `dbufCount`/the run-length multiplier
+  promoted to `uint` and the cached signed `dbufSize` local removed
+  entirely in favor of re-reading `param_1[0x12]` with an explicit
+  `(uint)` cast at each use — exactly the "changed the relevant variables
+  to unsigned" fix described in `info.md`. Both saved.
+- `CVE-2026-29004` (`option_to_env`, udhcpc6): took several wrong turns
+  before landing on the right function, because this binary — like all
+  10 — contains every applet from the shared minimal build config (man,
+  awk, bunzip2, unlzma, udhcpc6 all together, not just the one relevant
+  applet per sample), so generic heuristics like "self-recursive
+  function" or a string search on a *shared* global matched unrelated
+  code from other applets first (awk's AST-size walker, then what turned
+  out to be ash/hush shell option-parsing code). Eventually found it by
+  searching for `"option data exceeds option length"` (a string that
+  belongs to a sibling function, `string_option_to_env`) and discovering
+  the compiler had **inlined `string_option_to_env` directly into
+  `option_to_env`** under `-Os` (it was only called from one call site),
+  so there was really only one function to find, not two — explains the
+  earlier confusion. Confirmed via the self-recursive call
+  (`option_to_env(param_1+0x10, ...)` matching the `D6_OPT_IA_PD`/`IA_NA`
+  recursion) and the IAADDR/IAPREFIX case bodies.
+- **Bug found comparing vulnerable vs. patched**: the two decompiled
+  `option_to_env` functions came back byte-for-byte identical. Checked
+  the real source diff directly — the actual fix
+  (`xmalloc(4 + addrs * 40 - 1)` → `xmalloc(4 + addrs * 40 + 1)`, plus two
+  `!= 0` loop-condition changes) lives inside `case D6_OPT_DNS_SERVERS`,
+  which is wrapped in `#if ENABLE_FEATURE_UDHCPC6_RFC3646`. The minimal
+  build config only enabled `CONFIG_UDHCPC6` + its `CONFIG_FEATURE_IPV6`
+  dependency, never `CONFIG_FEATURE_UDHCPC6_RFC3646` — so that entire
+  branch, including the actual bug, was never compiled into either
+  binary. Both binaries contain a real, legitimately-decompiled
+  `option_to_env` — it's just missing the one branch that matters for
+  this CVE.
+- This is a real blind spot in Stage 3's automated build verification:
+  the `nm`-based per-sample check (added after the earlier `FEATURE_IPV6`
+  incident) only confirms the target *function* is present, not that a
+  specific *branch inside it* survived preprocessing. A function can
+  exist and still be missing its bug if a narrower feature flag gates
+  just that branch. Documented in `pseudo-code/README.md` as a "known
+  bug, not yet fixed" so it isn't lost, along with the exact fix needed:
+  add `CONFIG_FEATURE_UDHCPC6_RFC3646=y`, rebuild only the 2
+  `CVE-2026-29004-busybox` binaries (the other 8 samples are unaffected —
+  none of their fixes sit behind an additional feature flag beyond what's
+  already enabled), verify the DNS-servers branch actually compiled in
+  this time (e.g. check for a reference to `sprint_nip6`, only called
+  from within that branch), then redo this sample's Ghidra decompilation.
+- **Committed as-is for the day**: 4 of 5 samples' pseudo-code done and
+  verified (`CVE-2021-42373`, `CVE-2021-42374`, `CVE-2021-42386`
+  vulnerable-only, `CVE-2017-15873`). `CVE-2026-29004` saved but flagged
+  unusable until the rebuild above happens — do not run the benchmark
+  against it in its current state.
