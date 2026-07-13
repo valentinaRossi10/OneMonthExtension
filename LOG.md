@@ -280,3 +280,34 @@ One entry per session/action — used to track progress against `PLAN.md`.
   they actually appear — expect uglier variable names than hoped, but
   that alone doesn't imply the full regex/data-resolution machinery is
   needed.
+
+## 2026-07-13 — Stage 3: compiled and stripped all 5 samples to binaries
+
+- Compiled all 5 vulnerable/patched commit pairs to real ELF relocatable
+  objects (`.o`, via BusyBox's own captured build command — same commits
+  and config-regeneration approach as Stage 2's IR build, but without
+  `-emit-llvm`, i.e. actual `gcc` compilation). Verified via `nm` that
+  each target function (`option_to_env`, `nvalloc`, `get_next_block`,
+  `man_main`, `unpack_lzma_stream`) is present in the expected file(s),
+  and correctly absent from CVE-2021-42386's patched object (`nvalloc`
+  removed by the fix, same as the IR check in Stage 2).
+- Stripped all 10 objects: `strip --strip-all`.
+- Caught a second, more subtle information leak before finishing: BusyBox
+  compiles with `-ffunction-sections`, so each function lives in its own
+  ELF section (e.g. `.text.option_to_env`). `strip --strip-all` removes
+  the *symbol table* but does **not** remove section names — so even a
+  "stripped" object still had the vulnerable function's name sitting
+  directly in its section headers, undermining the whole point of
+  stripping (avoiding handing the LLM a free hint). Fixed by renaming
+  every per-function `.text.<fn>` / `.data.<fn>` / `.rodata.<fn>` section
+  to its generic form (`.text`, `.data`, `.rodata`) via
+  `objcopy --rename-section`, then re-verified with `nm` (no symbols) and
+  `strings` (no target function names anywhere in the file) across all 10
+  objects — all clean.
+- Copied results into `binaries/<sample-name>/{vulnerable,patched}.o` for
+  all 5 samples, with a `binaries/README.md` documenting the build +
+  strip + section-anonymization steps and why each was necessary.
+- Next: install Ghidra, decompile each stripped `.o` to pseudo-C (headless
+  analyzer + decompiler script), then inspect the output by eye before
+  deciding whether any cleanup pass is actually needed (per the 2026-07-12
+  clarification above).
