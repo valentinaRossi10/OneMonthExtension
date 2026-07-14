@@ -773,3 +773,64 @@ One entry per session/action — used to track progress against `PLAN.md`.
 - Next: `binwalk -e` both `.chk` files, locate the binary(ies) handling
   `/cgi-bin/` requests. User is doing this step manually/hands-on going
   forward rather than delegating each command.
+
+## 2026-07-14 — Firmware extraction started; a second, deeper scoping correction
+
+- Moved both downloaded firmware `.zip`/`.chk` files (and their
+  extractions) out of the git repo entirely, into
+  `/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/firmware/netgear-r6400/`
+  — a sibling of, not inside, `OneMonthExtension` — so the no-redistribution
+  policy can't be violated by accident (nothing proprietary is even
+  reachable from `git add -A` in the tracked repo).
+- User ran `binwalk -e` on the vulnerable `.chk` herself (working hands-on
+  from here on, not delegating each command). Despite `sasquatch`
+  extractor warnings, extraction succeeded via binwalk's fallback,
+  producing a real `squashfs-root/` filesystem (confirmed via the TRX
+  header + SquashFS signature binwalk detected, and real symlink warnings
+  referencing actual extracted files).
+- Searched the extracted filesystem for cgi-bin/web-server binaries;
+  found several candidates (`www/cgi-bin/genie.cgi`,
+  `usr/sbin/httpd`, plus some remote-management/ReadyCLOUD `.cgi`
+  binaries under `opt/`). Reasoned that `usr/sbin/httpd` is the more
+  likely target over `genie.cgi`, since the CVE's exploit path
+  (`/cgi-bin/;<command>`) is a bare semicolon with no real script name —
+  suggesting the bug is in how `httpd` itself parses the URL path, before
+  ever dispatching to a named `.cgi` file. Confirmed both are genuinely
+  separate ELF binaries (not symlinks to each other): ARM 32-bit, EABI5,
+  dynamically linked against uClibc, stripped.
+- **Second scoping correction, deeper than the previous one**: while
+  explaining why we're locating `httpd` manually (ground truth only, not
+  what the LLM sees — per the earlier correction), the user pushed further:
+  isn't scoping the LLM's task to "every function in `httpd`" *itself*
+  still a hint, the same way "the one known function" was? Yes — this is
+  the same principle applied one level up. Researched where this is
+  actually addressed in the literature: MANGODFA names it "border binary"
+  selection. Karonte/SaTC pre-filter a firmware image (127 binaries on
+  average, MANGODFA's own reported figure) down to a small heuristically-
+  guessed subset before analyzing anything (SaTC caps this at 3 border
+  binaries per image) — and this filtering causes real missed
+  vulnerabilities: MANGODFA's own paper cites the exact cross-binary bug
+  discussed earlier (`dlnad`) as a case SaTC/Karonte missed specifically
+  because their border-binary heuristic excluded it for being small and
+  not "web-facing enough." MANGODFA's actual fix isn't a smarter
+  heuristic — it's making their core dataflow analysis fast enough to
+  analyze every binary in a firmware image with no filtering at all
+  (6,920 binaries across 49 images). Checked FirmAgent/HermeScan/PANGOLIN
+  for the same discussion — found none; they don't appear to treat binary
+  selection as a first-class problem the way MANGODFA does.
+- Decision: keep this phase's scope at "every function in one
+  human-pre-selected binary" (explicitly named as the middle rung of a
+  3-rung ladder: single function → whole binary → whole firmware with no
+  hints), since MANGODFA's own solution to full-firmware scanning required
+  a novel, fast algorithm that doesn't translate to this project's setup
+  (bottlenecked by billed LLM calls per function, not local compute).
+  Documented this whole discussion — the exact MANGODFA quote, the 3-rung
+  ladder, and why whole-firmware-no-hints scanning is a separate,
+  explicitly out-of-scope stretch goal (arguably harder than the
+  large-scale-evaluation one already noted) — directly in `PLAN.md`'s
+  Stage 7, so the reasoning survives even though the final scope decision
+  didn't change from the previous entry.
+- Next: continue locating the real vulnerable function inside `httpd` —
+  user was about to search for cross-references to the `system` import
+  (visible by name even in a stripped dynamically-linked binary, since
+  imports must keep their names for the dynamic linker to resolve them).

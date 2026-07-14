@@ -293,6 +293,59 @@ cross-binary vulnerability at all, since an isolated function has no
   taint-style multi-step prompt) — genuinely new work, not a reuse of the
   single-function prompt shape.
 
+**A further scoping question raised during planning: isn't "every
+function in the relevant binary" still a hint?** Yes — worth being
+explicit about this rather than overselling the correction above as fully
+"unguided." Scoping to one pre-selected binary (`httpd`) still tells the
+LLM "look here, not at the other ~127 binaries in this firmware image"
+(127 is MANGODFA's own reported average binaries-per-image across the
+Karonte dataset). Deciding *which* binary is even worth deep analysis is
+a distinct, genuinely hard problem — not something to casually absorb
+into this phase alongside everything else already being tested for the
+first time (real architecture, real vendor binary, new bug class,
+possible cross-binary reasoning).
+
+This is a named, first-class problem in the literature — MANGODFA calls
+it "border binary" selection. Karonte and SaTC (the tools MANGODFA
+compares against) pre-filter a firmware image down to a small set of
+binaries heuristically guessed to handle user input (e.g. binaries with
+many references to URL-parameter-like strings); SaTC caps this at **3
+border binaries per firmware image**. This filtering causes real, cited
+false negatives — MANGODFA's own motivating example is exactly the
+cross-binary vulnerability discussed above:
+
+> "SaTC missed this vulnerability, and Karonte would have as well...
+> because the border binary analysis for both tools does not include
+> `dlnad` as a potential target. For example, SaTC prioritizes binaries
+> with more references to frontend keywords and limits border binaries to
+> three per firmware image. Due to the simple functionality and small
+> size of `dlnad`, it is excluded by the border binary selection
+> algorithm in SaTC."
+
+MANGODFA's actual answer isn't a smarter selection heuristic — it's
+removing the need for one, by making their core dataflow analysis fast
+enough to analyze *every* binary in a firmware image (6,920 binaries
+across the 49-image Karonte dataset, no filtering at all). That's a real
+research contribution (a novel, fast algorithm) that doesn't translate
+directly to this project's setup: our bottleneck is LLM API calls per
+function, not slow classical dataflow analysis, so "just analyze
+everything" doesn't scale the same way for us — every function costs a
+real, billed API call, not milliseconds of local compute. Checked the
+other 3 papers (FirmAgent, HermeScan, PANGOLIN) for the same
+terminology/problem — found no equivalent discussion; they appear to
+inherit whatever scoping their own pipeline already implies (e.g.
+PANGOLIN starts from captured network traffic, which implicitly tells it
+which binary handled a given request) rather than treating binary
+selection as a first-class problem the way MANGODFA does.
+
+**Decision**: keep this phase's scope at "every function within one
+binary, manually pre-selected by us" (rung 2 of a 3-rung ladder: single
+function → whole binary → whole firmware with no hints). Name
+whole-firmware, no-hints scanning as a separate, explicitly out-of-scope
+future goal — arguably *harder* than the "large-scale" scope-out below,
+since MANGODFA's own solution required a novel core algorithm, not just
+more compute time.
+
 **No-redistribution policy**: vendor firmware is proprietary, unlike
 BusyBox (GPL, self-compiled). The repo will document exact download
 URLs + checksums for reproducibility, but will not commit the firmware
