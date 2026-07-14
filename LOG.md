@@ -896,3 +896,48 @@ One entry per session/action — used to track progress against `PLAN.md`.
   `system()` replaced with a non-shell exec). Then build the actual LLM
   discovery task (every function in `httpd`, not just these three) per
   the ground-truth-vs-LLM-task split already documented in `PLAN.md`.
+
+## 2026-07-14 — Wrote (but paused) the bulk-export tooling; found and confirmed the patched fix
+
+- Before locating the patched function, started building the tooling for
+  the actual next step per `PLAN.md` (every function in `httpd`, not just
+  the 3 traced for ground truth): found the existing GUI project on disk
+  (`~/Ghidra-projects/iot-static-benchmark/IoT-Sec-Static.gpr`, program
+  path `/netgear/httpd`) and Ghidra's install
+  (`~/Ghidra/ghidra_12.1.2_PUBLIC`), then wrote
+  `scripts/ghidra/export_all_functions.py` — a headless post-script that
+  iterates every function via `DecompInterface`, skips thunks/externals
+  and anything under a minimum size (agreed via a quick check-in: filter
+  by size rather than export all 1393 functions unfiltered or apply a
+  more elaborate scheme), and writes each surviving function to its own
+  `FUN_<address>.c` file. Paused before running it — user wanted to find
+  the patched ground truth first, so this is written and ready but not
+  yet executed.
+- Located `netgear_commonCgi` in the **patched** (v1.0.1.20) binary
+  directly via string search on `ntgr_cgi_debug_msg` (a debug-logging
+  string used throughout the function, unique enough to skip re-tracing
+  the whole `parse_http_request` → `handle_get` chain). Confirmed same
+  function, same overall structure, same `strcpy`/`sprintf`/`system()`
+  pattern still present — **the root cause itself was not removed**.
+- The actual fix is two new defensive checks added in front of the
+  unchanged vulnerable code:
+  1. A blocklist check at function entry, on the raw URL, rejecting the
+     whole request if it contains `;`, `` ` ``, `$`, or `..` — `;` being
+     exactly the character the real exploit needs, so this directly
+     closes the documented attack.
+  2. A new allowlist check (added after the vulnerable `strcpy` but
+     before the `sprintf`/`system()` call) comparing the parsed CGI name
+     against a fixed array of allowed strings, exiting if there's no
+     exact match.
+  Flagged a genuine security observation worth keeping: this is a
+  blocklist/allowlist patch, not a root-cause fix — the blocklist only
+  covers 4 specific patterns (not `|`, `&`, `>`, `<`, newline, etc.), and
+  the unsafe `sprintf`-into-`system()` pattern itself is still there.
+- Saved `pseudo-code/patched/netgear_commonCgi.c` and updated `info.md`
+  with the full fix analysis (both code snippets, the security note).
+  `CVE-2016-6277-netgear-r6400`'s ground truth is now complete on both
+  sides.
+- Next: run the paused `export_all_functions.py` headless script against
+  both the vulnerable and patched `httpd` binaries to get the full
+  function set for the actual LLM discovery task, per the
+  ground-truth-vs-LLM-task split.
