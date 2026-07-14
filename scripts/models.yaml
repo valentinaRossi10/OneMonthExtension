@@ -4,15 +4,17 @@
 # model: the exact API model ID.
 #
 # NOTE: exact model names/versions still need confirming with the mentor
-# (raised in the email about API access — see LOG.md). The Anthropic IDs
-# below are current as of this project's Claude Code environment; the
-# OpenAI one is a placeholder — replace with the confirmed model ID before
-# running.
+# (raised in the email about API access — see LOG.md). The Anthropic ID
+# below reflects the mentor's mention of "Fable". For OpenAI, the mentor
+# said to use "the latest model" — filled in as gpt-5.6-sol (OpenAI's
+# current flagship, released July 2026; the canonical API model ID, not
+# the shorter "gpt-5.6" alias, since aliases can get repointed to a
+# different model later) as of 2026-07-14. Still worth confirming with
+# the mentor that this is specifically what he meant, since "latest"
+# will keep changing.
 
 models:
   - provider: anthropic
-    model: claude-sonnet-5
-  - provider: anthropic
-    model: claude-opus-4-8
+    model: claude-fable-5
   - provider: openai
-    model: REPLACE_ME_CONFIRM_WITH_MENTOR
+    model: gpt-5.6-sol
