@@ -233,6 +233,87 @@ whether IR-only is sufficient or source context is needed. This comparison
 is the actual deliverable for this stage and motivates the next phase of
 the hybrid approach.
 
+## Stage 7 — Real firmware proof-of-concept (branch `W1/firmware-static-analysis`)
+
+Everything through Stage 6 is a **calibration benchmark**: 5 hand-picked
+known CVEs in one open-source project (BusyBox), compiled ourselves. This
+validated the *methodology* (decompile → prompt → score), but never
+tested it against a real, unmodified vendor binary, a different CPU
+architecture, cross-binary vulnerabilities, or a non-memory-safety bug
+class. Stage 7 is a single, small proof-of-concept addressing exactly
+that gap — not an attempt to replicate the reference papers' scale (see
+below).
+
+**Target**: CVE-2016-6277 — an unauthenticated command injection via
+`/cgi-bin/;<command>` on the Netgear R6400/R7000 router. Vulnerable
+firmware: R6400 v1.0.1.12. Fixed firmware: R6400 v1.0.1.20 (per Netgear's
+own advisory). If both versions are obtainable, this gives a real
+vulnerable/patched *firmware* pair, extending the existing
+vulnerable-vs-patched comparison methodology to vendor binaries instead
+of self-compiled ones. Firmware source: the Karonte dataset (49 real
+firmware images, Netgear/D-Link/TP-Link/Tenda — the same dataset
+MANGODFA evaluates against), or Netgear's own firmware archive directly
+if the exact versions are available there.
+
+**Why this differs structurally from Stages 1-5** (see `firmware/README.md`
+once created): no source code exists, so there's no `samples/`/`ir/`
+equivalent — the pipeline starts directly from a compiled vendor binary.
+The vulnerability is also cross-binary (one binary sets a value via NVRAM,
+a different binary reads and unsafely uses it), unlike every BusyBox
+sample, which was a single self-contained function. Command injection
+also needs a new prompt template (`prompts/command-injection.md`) — none
+of the 5 existing memory-safety templates apply.
+
+**No-redistribution policy**: vendor firmware is proprietary, unlike
+BusyBox (GPL, self-compiled). The repo will document exact download
+URLs + checksums for reproducibility, but will not commit the firmware
+images or the full `binwalk` extraction — only the small decompiled
+pseudo-C snippet actually analyzed (the same scope PANGOLIN/MANGODFA
+themselves publish in their papers, not the underlying binaries).
+
+**Steps**:
+1. Confirm both firmware versions (1.0.1.12 vulnerable, 1.0.1.20 fixed)
+   are actually obtainable (Karonte dataset or Netgear's archive).
+2. `binwalk -e` both images, locate the vulnerable binary(ies) — not yet
+   known for certain; the CERT advisory names the endpoint
+   (`/cgi-bin/`) but not the internal binary name.
+3. Ghidra-decompile the vulnerable version, using the same
+   string-search/structural-matching techniques already practiced on the
+   BusyBox samples (real firmware is typically also stripped).
+4. Decompile the patched version, diff to confirm the located code
+   actually changed (same verification approach used for all 5 BusyBox
+   samples).
+5. Write `firmware/CVE-2016-6277-netgear-r6400/info.md`,
+   `pseudo-code/{vulnerable,patched}/`, and `index.csv`.
+6. Add `prompts/command-injection.md` and the matching entry in
+   `scripts/bug_classes.py`.
+7. Run through the existing `run_benchmark.py`/`score.py` pipeline
+   unchanged (it's already generic over `samples/index.csv`-shaped
+   input; may need a small extension to also read `firmware/index.csv`).
+
+### Explicitly out of scope for now: large-scale evaluation
+
+All 4 reference papers' actual headline contributions are large-scale
+**zero-day discovery** runs, not known-CVE validation:
+
+| Paper | Firmware images | Result |
+|---|---|---|
+| FirmAgent | 14 | 182 vulnerabilities, 140 previously unknown, 17 CVEs assigned |
+| HermeScan | 30 (0-day set) + 98 (N-day set) | 163 vulnerabilities in the 0-day set |
+| MANGODFA | 49 + 7 + 1,698 (large-scale) | 83,644 raw alerts → 70 PoC-verified vulnerabilities |
+| PANGOLIN | 12 real devices, 8 vendors | 68 previously unknown, 31 CVEs assigned |
+
+This is two-plus orders of magnitude beyond what's realistic for a
+one-month solo extension (their scale reflects teams of 5-9 researchers
+over months, plus real vendor-disclosure processes). Genuinely scaling
+up — acquiring many real firmware images (e.g. the full 49-image Karonte
+dataset) and either validating against many known CVEs or running actual
+unlabeled exploratory scanning across every extracted binary — is a
+legitimate, meaningful next step **after** the single-CVE proof-of-concept
+above works, but is a real scope/time decision (weeks of compute and
+manual triage) that should be discussed explicitly with the mentor rather
+than assumed as an automatic continuation.
+
 ## Immediate next actions
 
 1. ~~Stage 0: environment setup.~~ Done.
@@ -260,3 +341,7 @@ the hybrid approach.
    addressed the code-representation question).
 8. **Ready to run once API keys exist** — the full pipeline (samples → IR
    → binaries → pseudo-code → prompts → scripts) is complete end to end.
+9. Stage 7 (started, branch `W1/firmware-static-analysis`): confirm the
+   Netgear R6400 firmware (v1.0.1.12 vulnerable, v1.0.1.20 fixed) is
+   actually obtainable, then extract/decompile/compare per the steps
+   above.

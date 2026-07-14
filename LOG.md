@@ -639,3 +639,85 @@ One entry per session/action — used to track progress against `PLAN.md`.
   Stage 5 section to describe the cross-product design and the new
   `scoring.csv` columns.
 - Still blocked on API keys to actually run this for real.
+
+## 2026-07-14 — Emailed mentor for API access; branched for the real-firmware phase
+
+- Drafted and sent an email to the mentor requesting API access (he had
+  mentioned providing it earlier but no keys have arrived yet), and asked
+  him to confirm the exact model IDs. He'd mentioned "Fable" for
+  Anthropic and "the latest model" for OpenAI during our conversation —
+  updated `scripts/models.yaml` accordingly: `claude-fable-5` (replacing
+  the two earlier placeholder Claude IDs), and looked up OpenAI's actual
+  current flagship (`gpt-5.6-sol`, released this month) rather than leave
+  a placeholder, since "latest" isn't a pinned model ID — still worth
+  the mentor confirming this is specifically what he meant.
+- While waiting on the reply, started planning the next phase: moving
+  from the self-compiled BusyBox benchmark to real, unmodified firmware,
+  using binwalk + Ghidra (the mentor's original suggestion, and the
+  actual approach in all 4 reference papers). Branched to
+  `W1/firmware-static-analysis` for this planning work, off
+  `W1/linked-binaries` (clean tree, nothing uncommitted).
+- Worked through what actually changes vs. the BusyBox benchmark, since
+  the two could look superficially redundant: the benchmark validated the
+  *methodology* (decompile → prompt → score) on binaries we fully
+  controlled (self-compiled, x86-64, single self-contained functions,
+  memory-safety only). Real firmware introduces several genuinely
+  untested variables at once — unfamiliar toolchain/architecture
+  (ARM/MIPS, vendor compilers), a different bug class (command injection,
+  not memory safety — and what the reference papers actually center on),
+  cross-binary vulnerabilities (one binary sets shared state, a different
+  binary unsafely uses it — the specific hard problem
+  Karonte/MANGODFA/SaTC exist to solve), and the binary-discovery step
+  itself (in the benchmark we always already knew which file/function to
+  target; with real firmware, finding the right binary among everything
+  `binwalk` extracts is itself untested).
+- Checked all 4 papers' actual evaluation scale directly (pulled from
+  their abstracts, not memory) to calibrate expectations honestly:
+  FirmAgent (14 firmware, 182 vulns/140 new/17 CVEs), HermeScan (30+98
+  firmware, 163 vulns in the 0-day set), MANGODFA (49+7+1,698 firmware,
+  83,644 raw alerts → 70 PoC-verified vulns), PANGOLIN (12 devices/8
+  vendors, 68 new vulns/31 CVEs). All 4 papers' actual headline
+  contribution is large-scale *zero-day* discovery, not known-CVE
+  validation — known-CVE checking is closer to their internal sanity
+  check. That scale (teams of 5-9 researchers, months, real vendor
+  disclosure) is unrealistic for a one-month solo extension, so decided
+  explicitly NOT to aim for it now — noted as a distinct, deliberately
+  out-of-scope future decision point in `PLAN.md` rather than something to
+  casually fold into "the next phase."
+- Instead scoped this phase down to one concrete proof-of-concept: does
+  the pipeline survive contact with a real, unmodified vendor binary at
+  all. Picked **CVE-2016-6277** (unauthenticated command injection,
+  `/cgi-bin/;<command>`, Netgear R6400/R7000) as the target — chose this
+  over the `iserver_passcode`/`dlnad` example MANGODFA's own paper shows
+  (Listing 1), since that one appears to be a research finding by the
+  paper's authors without a confirmed formal CVE ID, whereas CVE-2016-6277
+  is a real, citable, formally assigned CVE with known vulnerable
+  (R6400 v1.0.1.12) and fixed (v1.0.1.20) firmware versions per Netgear's
+  own advisory — meaning a real vulnerable/patched *firmware* pair may be
+  obtainable, extending the exact comparison methodology already used for
+  BusyBox to unmodified vendor binaries. Firmware source: the Karonte
+  dataset (49 real firmware images from Netgear/D-Link/TP-Link/Tenda —
+  the same dataset MANGODFA evaluates against), confirmed via its GitHub
+  README to be freely downloadable (Google Drive link), not gated behind
+  a request form.
+- Decided on a **no-redistribution policy** before planning the folder
+  layout: unlike BusyBox (GPL, self-compiled), vendor firmware is
+  proprietary — won't commit firmware images or the full `binwalk`
+  extraction to the repo, only document exact download URLs/checksums for
+  reproducibility and commit the small decompiled pseudo-C snippet
+  actually analyzed (the same scope PANGOLIN/MANGODFA themselves publish
+  in their papers).
+- Designed the repo layout: a new top-level `firmware/` folder, sibling
+  to (not nested inside) `samples/`/`ir/`/`binaries/`/`pseudo-code/`,
+  since the firmware pipeline has a structurally different shape (no
+  source, no IR stage, cross-binary rather than single-function) and
+  folding it into the existing folders would misrepresent what's there.
+  Also need a new `prompts/command-injection.md` template and a matching
+  entry in `scripts/bug_classes.py`, since none of the 5 existing
+  memory-safety templates apply to this bug class.
+- Wrote all of the above into `PLAN.md` as a new "Stage 7" section, plus
+  an explicit "out of scope for now" subsection with the 4-paper scale
+  comparison table, and added an "immediate next actions" item.
+- Next: confirm both exact Netgear R6400 firmware versions
+  (1.0.1.12 vulnerable, 1.0.1.20 fixed) are actually obtainable (Karonte
+  dataset or Netgear's own archive) before doing any extraction work.
