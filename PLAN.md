@@ -231,17 +231,23 @@ the hybrid approach.
    `samples/index.csv`.~~ Done — 5 samples, 5 memory-safety CWE classes.
 3. ~~Stage 2: generate `.ll` files for each sample.~~ Done — all 5 samples
    have verified vulnerable/patched LLVM IR pairs in `ir/`.
-4. ~~Stage 3: compile the 5 samples to binaries, strip them.~~ Done — all
-   5 samples have verified vulnerable/patched linked+stripped executables
-   in `binaries/` (see `LOG.md` for the relocation-bug and
-   `FEATURE_IPV6` dependency bugs caught and fixed along the way). Next:
-   install Ghidra, decompile to `pseudo-code/`, check whether cleanup is
-   actually needed.
+4. ~~Stage 3: compile the 5 samples to binaries, strip them, decompile to
+   pseudo-C.~~ Done — all 5 samples have verified vulnerable/patched
+   linked+stripped executables in `binaries/` and decompiled pseudo-C in
+   `pseudo-code/` (4 full pairs + `CVE-2021-42386`'s intentional
+   vulnerable-only case). See `LOG.md` for the relocation-bug,
+   `FEATURE_IPV6` dependency bug, and `FEATURE_UDHCPC6_RFC3646` dependency
+   bug caught and fixed along the way — no cleanup pass needed, per the
+   2026-07-12 assessment (small, self-contained functions decompiled
+   cleanly).
 5. ~~Stage 4: build prompt templates per bug class.~~ Done — see
    `prompts/`.
 6. ~~Stage 5: script the benchmark runner + scorer.~~ Done — see
-   `scripts/`. Not yet actually run (no API keys configured yet); will
-   fall back to `ir/` for all samples until `pseudo-code/` exists.
+   `scripts/`. Not yet actually run (no API keys configured yet); will now
+   use `pseudo-code/` as primary input for 5/5 samples (falling back to
+   `ir/` only for `CVE-2021-42386`'s patched variant, by design).
 7. Still to confirm with mentor: exact OpenAI model ID for the benchmark
    (raised in earlier email, not yet answered — his reply so far only
    addressed the code-representation question).
+8. **Ready to run once API keys exist** — the full pipeline (samples → IR
+   → binaries → pseudo-code → prompts → scripts) is complete end to end.

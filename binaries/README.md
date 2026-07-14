@@ -59,3 +59,26 @@ a real target. See `LOG.md` (2026-07-12 methodology correction entry) for
 why stripping is necessary, and the 2026-07-13 entries for the
 relocation-bug fix and the udhcpc6/`FEATURE_IPV6` bug caught during the
 rebuild.
+
+## Update (2026-07-14): fixed a second config gap in the CVE-2026-29004 binaries
+
+Manually decompiling `CVE-2026-29004-busybox` in Ghidra revealed the
+vulnerable/patched `option_to_env` decompiled **identically** — the actual
+CVE-2026-29004 fix (`xmalloc(4 + addrs * 40 - 1)` →
+`xmalloc(4 + addrs * 40 + 1)`, inside `case D6_OPT_DNS_SERVERS`) is gated
+by `#if ENABLE_FEATURE_UDHCPC6_RFC3646` in the source, and the minimal
+config only enabled `CONFIG_UDHCPC6` + `CONFIG_FEATURE_IPV6` — never
+`CONFIG_FEATURE_UDHCPC6_RFC3646` — so that whole branch, including the
+bug, was preprocessed out of both binaries. `option_to_env` the function
+was present and correctly verified by the existing `nm` check (see point 3
+above), but the *specific branch* wasn't — the earlier check had no way to
+catch that.
+
+Fixed by adding `CONFIG_FEATURE_UDHCPC6_RFC3646=y` and rebuilding just
+these 2 binaries, this time also checking (via `nm` on
+`busybox_unstripped`) that `sprint_nip6` is present — it's a function only
+called from inside the `D6_OPT_DNS_SERVERS` branch, so its presence proves
+that specific branch actually compiled in. Re-stripped and re-verified
+clean (no symbols, no per-function sections, no leaked names) the same way
+as the other 9 binaries. See `LOG.md`/`pseudo-code/README.md` for the full
+diagnosis.

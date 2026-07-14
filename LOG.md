@@ -554,3 +554,40 @@ One entry per session/action — used to track progress against `PLAN.md`.
   vulnerable-only, `CVE-2017-15873`). `CVE-2026-29004` saved but flagged
   unusable until the rebuild above happens — do not run the benchmark
   against it in its current state.
+
+## 2026-07-14 — Fixed CVE-2026-29004: rebuilt with the missing config flag
+
+- Added `CONFIG_FEATURE_UDHCPC6_RFC3646=y` to the minimal build config
+  (its only dependency, `CONFIG_UDHCPC6`, was already enabled) and
+  rebuilt just the 2 `CVE-2026-29004-busybox` binaries — the other 8 were
+  unaffected by this gap and didn't need touching.
+- Extended the per-sample verification for this rebuild beyond the
+  existing "target function present" `nm` check: also confirmed
+  `sprint_nip6` (a function only called from inside the
+  `D6_OPT_DNS_SERVERS` branch) is present in `busybox_unstripped` for
+  both binaries — proof the specific vulnerable branch actually compiled
+  in this time, not just the surrounding function.
+- Re-stripped and re-verified clean the same way as the other 9 binaries
+  (`nm`: no symbols, `readelf -S`: no per-function sections, `strings`:
+  no leaked function/file names). Replaced
+  `binaries/CVE-2026-29004-busybox/{vulnerable,patched}` in the repo.
+- Re-decompiled `option_to_env` in Ghidra for both binaries. This time
+  vulnerable and patched differ exactly where expected: inside the
+  `D6_OPT_DNS_SERVERS` case, the allocation size changes from
+  `(addrs >> 4... ) * 0x28 + 3` to `* 0x28 + 5` — the decompiled/optimized
+  form of `xmalloc(4 + addrs*40 - 1)` → `xmalloc(4 + addrs*40 + 1)`
+  (constant-folded: `4 - 1 = 3`, `4 + 1 = 5`). Confirms the fix is
+  correctly represented now. Saved both files, overwriting the earlier
+  (incomplete) vulnerable-only save.
+- **All 5 samples are now complete**: 4 full vulnerable/patched pairs
+  (`CVE-2026-29004`, `CVE-2021-42373`, `CVE-2021-42374`,
+  `CVE-2017-15873`) plus `CVE-2021-42386`'s intentional vulnerable-only
+  case (fix removes the function entirely; `run_benchmark.py` falls back
+  to IR for that one variant). Stage 3 (compile/strip/decompile) is done.
+- Updated `pseudo-code/README.md` and `binaries/README.md` to mark this
+  resolved rather than in-progress.
+- Next: no API keys yet, so Stage 5 (actually running
+  `scripts/run_benchmark.py`/`scripts/score.py`) is still blocked on
+  that. Otherwise the full pipeline (samples → IR → binaries → pseudo-code
+  → prompts → scripts) is complete and ready to run end-to-end once keys
+  are available.

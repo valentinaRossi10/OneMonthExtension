@@ -63,37 +63,27 @@ pseudo-code file exists — a legitimate use of the documented IR-fallback
 path (per the mentor's guidance: fall back to IR when pseudo-code can't
 represent the target), not a gap to fill in later.
 
-## Known bug (in progress): CVE-2026-29004 binaries are missing the vulnerable code path
+## Resolved: CVE-2026-29004 initially missing the vulnerable code path
 
-`pseudo-code/CVE-2026-29004-busybox/vulnerable.c` is saved but is **not
-usable yet** — do not run the benchmark against it until this is fixed.
+The first pass at `binaries/CVE-2026-29004-busybox/*` was missing the
+`CONFIG_FEATURE_UDHCPC6_RFC3646` config flag, so the branch containing the
+actual bug (`case D6_OPT_DNS_SERVERS`, the `xmalloc(4 + addrs * 40 - 1)`
+allocation) was preprocessed out of both binaries — `option_to_env`
+decompiled identically for vulnerable and patched, since the only real
+difference between them lives inside that missing branch. Diagnosed and
+fixed on 2026-07-14: added the flag, rebuilt just these 2 binaries,
+verified via `nm` that `sprint_nip6` (only called from inside that branch)
+is now present, and re-decompiled. The fix is now clearly visible in the
+decompiled diff (`* 0x28 + 3` → `* 0x28 + 5`, i.e. `addrs*40 + (4-1)` →
+`addrs*40 + (4+1)`). See `binaries/README.md` and `LOG.md` (2026-07-13 and
+2026-07-14 entries) for the full diagnosis.
 
-The actual vulnerable line (`xmalloc(4 + addrs * 40 - 1)`, inside `case
-D6_OPT_DNS_SERVERS`) is wrapped in `#if ENABLE_FEATURE_UDHCPC6_RFC3646` in
-the source. The minimal BusyBox build config used for all 10 binaries (see
-`binaries/README.md`) only enables `CONFIG_UDHCPC6` and its
-`CONFIG_FEATURE_IPV6` dependency — it never enabled
-`CONFIG_FEATURE_UDHCPC6_RFC3646`, so that entire `case` block, including
-the buggy allocation, was preprocessed out of both the vulnerable and
-patched binaries. Confirmed by decompiling both: `option_to_env` in each
-is byte-for-byte identical, because the only difference between the real
-vulnerable/patched source (the `xmalloc` size and two `!= 0` loop-condition
-changes) lives entirely inside the missing branch.
+This exposed a real blind spot in Stage 3's automated build verification:
+the `nm`-based check only confirms a target *function* is compiled in, not
+that a specific *branch inside it* survived preprocessing. Worth keeping
+in mind for any future sample where the vulnerable line sits behind its
+own `#if`/`#ifdef` — a function-presence check alone isn't sufficient in
+that case.
 
-This also exposes a real blind spot in Stage 3's automated build
-verification (`LOG.md`, 2026-07-13 entries): the `nm`-based check only
-confirmed the *function* `option_to_env` was compiled in, not that the
-*specific vulnerable branch inside it* was — a function can exist and
-still be missing the bug if a sub-feature flag gating that branch isn't
-enabled. Worth keeping in mind for any future sample where the vulnerable
-line sits behind its own `#if`/`#ifdef`.
-
-**Fix (not yet done):** add `CONFIG_FEATURE_UDHCPC6_RFC3646=y` to the
-minimal config, rebuild just the two `CVE-2026-29004-busybox`
-vulnerable/patched binaries (the other 8 are unaffected — none of their
-vulnerable lines are behind an extra feature flag beyond what's already
-enabled), re-verify via `nm`/`objdump` that the DNS-servers branch is
-actually present this time (e.g. check for a reference to `sprint_nip6`,
-which is only called from within that branch), re-run the Ghidra
-decompilation for this sample only, and overwrite both
-`pseudo-code/CVE-2026-29004-busybox/{vulnerable,patched}.c`.
+**All 5 samples are now complete** (4 full vulnerable/patched pairs, plus
+CVE-2021-42386's intentional vulnerable-only case above).
