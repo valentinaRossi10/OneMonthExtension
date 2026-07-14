@@ -1,3 +1,13 @@
 __pycache__/
 *.pyc
 .venv/
+
+# No-redistribution policy for vendor firmware (see firmware/README.md
+# and PLAN.md Stage 7) - never commit raw/extracted firmware images,
+# only the decompiled pseudo-C snippets actually analyzed.
+firmware/raw/*
+!firmware/raw/.gitkeep
+firmware/extracted/*
+!firmware/extracted/.gitkeep
+firmware/**/raw/
+firmware/**/extracted/

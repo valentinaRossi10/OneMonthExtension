@@ -834,3 +834,65 @@ One entry per session/action — used to track progress against `PLAN.md`.
   user was about to search for cross-references to the `system` import
   (visible by name even in a stripped dynamically-linked binary, since
   imports must keep their names for the dynamic linker to resolve them).
+
+## 2026-07-14 — Found and documented the ground-truth vulnerable function
+
+- Located `system`'s callers via Ghidra's Function Call Trees "Incoming
+  Calls" (the naive "Show References to Address" on the import stub only
+  showed 1 location — the import table's self-reference — not the real
+  call sites; Incoming Calls walks the actual disassembled call graph
+  instead and found the full list).
+- Rather than checking every `system()` caller one by one, worked
+  backward from the request-routing side instead: searched for the
+  literal strings `"cgi-bin"`/`"cgi-bin/"` (generic, not tied to any named
+  script — matching the exploit's script-name-less `/cgi-bin/;<command>`
+  pattern) and traced forward through the real call chain:
+  - **`parse_http_request`** — top-level HTTP router; explicitly checks
+    for the `cgi-bin` prefix as part of deciding which requests skip
+    authentication/session checks (this is *why* the exploit needs no
+    login).
+  - **`handle_get`** (`FUN_00019628`) — for any URL containing
+    `cgi-bin`, skips normal static-file serving and dispatches straight
+    to `FUN_00033e0c`.
+  - **`netgear_commonCgi`** (`FUN_00033e0c`) — the actual vulnerable
+    function. Confirmed unambiguously: for a URL with no `?` query
+    string (matching the real exploit), it takes everything after
+    `cgi-bin/` in the URL and copies it via `strcpy` into a 64-byte
+    stack buffer with **no length check and no character filtering**,
+    then splices that buffer into a shell command string via `sprintf`
+    (`"/www/cgi-bin/%s > /tmp/cgi_result"`) and executes it with
+    `system()`. For the exploit URL `/cgi-bin/;<command>`, the raw
+    substring after `cgi-bin/` is literally `;<command>` — `system()`
+    invokes the result via `/bin/sh -c`, where `;` is a command
+    separator, so the attacker's command runs as a fully separate shell
+    command, as root.
+- This confirms the mechanism matches the CVE description exactly (the
+  bare-semicolon, no-script-name exploit shape) and gives a precise,
+  traceable root cause — not just a plausible guess.
+- **Documented as ground truth**, per the earlier methodology correction
+  (this is for scoring an LLM's answer later, not what gets shown to it
+  directly): created `firmware/CVE-2016-6277-netgear-r6400/info.md` with
+  the full traced mechanism, download URLs + checksums for both firmware
+  versions, and an explicit note repeating why this is ground-truth-only.
+  Saved the two directly-relevant decompiled functions
+  (`netgear_commonCgi.c`, `handle_get.c`) to `pseudo-code/vulnerable/`;
+  didn't save `parse_http_request` verbatim (its role — auth-bypass for
+  `cgi-bin` — is already captured in `info.md`, and the function itself is
+  enormous and mostly unrelated language-detection logic, low marginal
+  value to store in full). Added `index.csv` in the same shape as
+  `samples/index.csv`, scoped to this phase.
+- Also found and reconciled a leftover from the very start of the
+  project: a placeholder `firmware/` folder already existed in the repo
+  (created before the CVE-benchmark pivot, with an outdated README
+  describing RetDec-based IR lifting — an approach since dropped for
+  Ghidra pseudo-code). Rewrote `firmware/README.md` to match the actual
+  Stage 7 pipeline and no-redistribution policy, and extended
+  `.gitignore` so the existing `firmware/raw/` and `firmware/extracted/`
+  folders (kept via `.gitkeep`) can hold real firmware locally without
+  ever being committed.
+- Next: locate the same function in the **patched** (v1.0.1.20) binary
+  the same way, to confirm what actually changed (expect either
+  sanitization/escaping added to the `strcpy`, a length bound, or
+  `system()` replaced with a non-shell exec). Then build the actual LLM
+  discovery task (every function in `httpd`, not just these three) per
+  the ground-truth-vs-LLM-task split already documented in `PLAN.md`.
