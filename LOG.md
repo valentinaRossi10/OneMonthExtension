@@ -591,3 +591,51 @@ One entry per session/action — used to track progress against `PLAN.md`.
   that. Otherwise the full pipeline (samples → IR → binaries → pseudo-code
   → prompts → scripts) is complete and ready to run end-to-end once keys
   are available.
+
+## 2026-07-14 — Redesigned the benchmark as a full prompt x sample cross-product
+
+- Raised a methodology question before running anything for real: the
+  original `run_benchmark.py` only ran each sample against its own
+  matching bug-class prompt (e.g. the NULL-deref sample only ever saw the
+  NULL-deref prompt). That only measures "can it find the bug when told
+  exactly what to look for" — it never tests whether a prompt stays quiet
+  on code that doesn't have that bug class, so mismatched-prompt false
+  positives (and the model's ability to correctly say "no, that's not
+  this bug class") were never exercised. Decided to run every prompt
+  template against every sample instead, not just matched pairs.
+- Factored the `bug_class -> prompt filename` mapping out of
+  `run_benchmark.py` into a new shared `scripts/bug_classes.py`, imported
+  by both `run_benchmark.py` and `score.py`, so the two can't drift apart
+  on which prompt "should" match which sample.
+- `run_benchmark.py`: now loops sample × variant × **every prompt in
+  `ALL_PROMPT_FILES`** × model (previously just sample × variant ×
+  model). Output filenames gained a 4th component:
+  `<cve_id>__<variant>__<model>__<prompt-slug>.md`. With 9 valid
+  sample/variant pairs (`CVE-2021-42386` patched has no code file, by
+  design), 5 prompts, and N models, that's `9 x 5 x N` calls — 90 for 2
+  models.
+- `score.py`: rewrote the expected-answer logic for the cross-product —
+  a prompt should only say "yes" if the code is the vulnerable variant
+  *and* the prompt's bug class actually matches the sample's real bug
+  class (checked via `bug_classes.BUG_CLASS_TO_PROMPT`); every other
+  combination should say "no." Replaced the old binary
+  hit/false_positive columns with a `category` column
+  (`true_positive`/`false_negative`/`true_negative`/`false_positive`) so
+  a "matching prompt found the real bug" is clearly distinguishable from
+  a "mismatched prompt hallucinated a bug that isn't there." Also prints
+  a per-category breakdown, a specialized-prompt detection rate, and
+  lists every false positive with its reason (patched code flagged vs.
+  wrong bug class hallucinated).
+- Verified the new scoring logic with a small dry run using hand-written
+  fake result files before trusting it: confirmed a matched
+  vulnerable-variant "yes" scores `true_positive`, and a mismatched
+  prompt saying "yes" on the same vulnerable file correctly scores
+  `false_positive` with the right reason. Deleted the test fixtures
+  afterward.
+- Added `.gitignore` (`__pycache__/`, `*.pyc`, `.venv/`) — hadn't been
+  needed until Python scripts started actually being imported/run
+  locally.
+- Updated `scripts/README.md`, `results/README.md`, and `PLAN.md`'s
+  Stage 5 section to describe the cross-product design and the new
+  `scoring.csv` columns.
+- Still blocked on API keys to actually run this for real.

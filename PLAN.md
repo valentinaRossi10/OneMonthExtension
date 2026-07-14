@@ -176,23 +176,32 @@ Each template:
   confidence, short reasoning) — see `prompts/README.md` for the exact
   format `scripts/score.py` parses.
 
-`scripts/run_benchmark.py` maps each sample's `bug_class` column to the
-matching template automatically.
+`scripts/bug_classes.py` maps each sample's `bug_class` column to its
+matching template — used by both scripts to know which prompt "should"
+detect which sample's real bug.
 
 ## Stage 5 — Run the benchmark (scripted — see `scripts/`)
 
 `scripts/run_benchmark.py` and `scripts/score.py` were built ahead of
 receiving API keys, so the pipeline is ready to run as soon as they're
-set up:
+set up. The benchmark runs the **full cross-product** — every prompt
+template against every sample, not just each sample's own matching
+prompt — specifically so mismatched-prompt false positives are visible,
+not just missed detections:
 
 1. `run_benchmark.py` loops over every sample × variant
-   (vulnerable/patched) × model configured in `scripts/models.yaml`,
-   builds the matching prompt (pseudo-code if available, else IR
-   fallback), calls the model, and saves raw output to
-   `results/runs/<cve_id>__<variant>__<model>.md`.
-2. `score.py` parses every run, extracts the `Vulnerable: yes/no`
-   verdict, compares it against the expected answer, and writes
-   `results/scoring.csv` plus an overall accuracy summary.
+   (vulnerable/patched) × **every prompt template** × model configured in
+   `scripts/models.yaml`, builds each prompt (pseudo-code if available,
+   else IR fallback), calls the model, and saves raw output to
+   `results/runs/<cve_id>__<variant>__<model>__<prompt-slug>.md`.
+2. `score.py` parses every run and compares it against what's expected
+   *given which prompt was used*: only a matching prompt on vulnerable
+   code should say yes; everything else (patched code, or a
+   non-matching prompt on vulnerable code) should say no. Labels each
+   row `true_positive` / `false_negative` / `true_negative` /
+   `false_positive`, writes `results/scoring.csv`, and prints a
+   breakdown plus every false positive found (distinguishing "patched
+   code flagged" from "wrong bug class hallucinated").
 
 See `scripts/README.md` for setup instructions and `results/README.md`
 for output format. Manual chat-UI runs are still fine for one-off spot

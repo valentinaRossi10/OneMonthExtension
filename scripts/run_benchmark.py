@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-Runs the vulnerability-detection benchmark: for each CVE sample (vulnerable
-and patched), for each configured model, asks the model to analyze the
-sample's code using the prompt template matching the sample's bug class.
+Runs the vulnerability-detection benchmark as a full cross-product: for
+each CVE sample (vulnerable and patched), for every prompt template (not
+just the one matching the sample's own bug class), for each configured
+model. Running every prompt against every sample — not just matched
+pairs — is what lets score.py distinguish "the specialized prompt found
+the real bug" from "an unrelated prompt hallucinated a false positive."
 
 Input code representation, in priority order per sample:
   1. pseudo-code/<sample>/{vulnerable,patched}.c   (primary, per mentor's decision)
@@ -15,11 +18,12 @@ Usage:
     python3 run_benchmark.py
 """
 import csv
-import os
 import sys
 from pathlib import Path
 
 import yaml
+
+from bug_classes import ALL_PROMPT_FILES
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SAMPLES_INDEX = REPO_ROOT / "samples" / "index.csv"
@@ -28,15 +32,6 @@ IR_DIR = REPO_ROOT / "ir"
 PROMPTS_DIR = REPO_ROOT / "prompts"
 RESULTS_DIR = REPO_ROOT / "results" / "runs"
 MODELS_CONFIG = Path(__file__).resolve().parent / "models.yaml"
-
-BUG_CLASS_TO_PROMPT = {
-    "heap-buffer-overflow": "memory-buffer-overflow.md",
-    "buffer-overflow": "memory-buffer-overflow.md",
-    "use-after-free": "memory-use-after-free.md",
-    "integer-overflow": "memory-integer-overflow.md",
-    "null-pointer-dereference": "memory-null-pointer-dereference.md",
-    "out-of-bounds-read": "memory-out-of-bounds-read.md",
-}
 
 
 def load_models():
@@ -62,10 +57,7 @@ def find_code_file(sample_dir_name: str, variant: str) -> tuple[Path, str]:
     return None, None
 
 
-def build_prompt(bug_class: str, code: str, representation: str) -> str:
-    template_name = BUG_CLASS_TO_PROMPT.get(bug_class)
-    if template_name is None:
-        raise ValueError(f"No prompt template mapped for bug_class={bug_class!r}")
+def build_prompt(template_name: str, code: str, representation: str) -> str:
     template = (PROMPTS_DIR / template_name).read_text()
     note = ""
     if representation == "llvm-ir":
@@ -115,7 +107,6 @@ def main():
     for sample in samples:
         cve_id = sample["cve_id"]
         project = sample["project"]
-        bug_class = sample["bug_class"]
         sample_dir_name = f"{cve_id}-{project}"
 
         for variant in ("vulnerable", "patched"):
@@ -129,24 +120,27 @@ def main():
                 continue
 
             code = code_path.read_text()
-            prompt = build_prompt(bug_class, code, representation)
 
-            for model_cfg in models:
-                provider = model_cfg["provider"]
-                model = model_cfg["model"]
-                if model.startswith("REPLACE_ME"):
-                    print(f"SKIP model {model!r}: placeholder, not configured", file=sys.stderr)
-                    continue
+            for prompt_file in ALL_PROMPT_FILES:
+                prompt_slug = Path(prompt_file).stem
+                prompt = build_prompt(prompt_file, code, representation)
 
-                out_file = RESULTS_DIR / f"{cve_id}__{variant}__{model}.md"
-                print(f"Running {cve_id} ({variant}, {representation}) x {model} ...")
-                try:
-                    response = call_model(provider, model, prompt)
-                except Exception as e:
-                    response = f"[ERROR calling {provider}/{model}: {e}]"
-                    print(f"  ERROR: {e}", file=sys.stderr)
+                for model_cfg in models:
+                    provider = model_cfg["provider"]
+                    model = model_cfg["model"]
+                    if model.startswith("REPLACE_ME"):
+                        print(f"SKIP model {model!r}: placeholder, not configured", file=sys.stderr)
+                        continue
 
-                out_file.write_text(response)
+                    out_file = RESULTS_DIR / f"{cve_id}__{variant}__{model}__{prompt_slug}.md"
+                    print(f"Running {cve_id} ({variant}, {representation}) x {model} x {prompt_slug} ...")
+                    try:
+                        response = call_model(provider, model, prompt)
+                    except Exception as e:
+                        response = f"[ERROR calling {provider}/{model}: {e}]"
+                        print(f"  ERROR: {e}", file=sys.stderr)
+
+                    out_file.write_text(response)
 
 
 if __name__ == "__main__":
