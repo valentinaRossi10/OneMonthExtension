@@ -721,3 +721,55 @@ One entry per session/action — used to track progress against `PLAN.md`.
 - Next: confirm both exact Netgear R6400 firmware versions
   (1.0.1.12 vulnerable, 1.0.1.20 fixed) are actually obtainable (Karonte
   dataset or Netgear's own archive) before doing any extraction work.
+
+## 2026-07-14 — Got both firmware versions directly from Netgear; caught a methodology gap before implementing
+
+- Checked whether the Karonte dataset (planned source) actually contains
+  the right R6400 firmware before committing to the ~1-hour download: its
+  `config/NETGEAR/r_6400.json` references `R6400v2`, firmware
+  `V1.0.2.46_1.0.36` — a different model variant/version than needed, and
+  already newer than even our target fixed version (1.0.2.46 > 1.0.1.20),
+  so it's almost certainly already patched and wouldn't contain
+  CVE-2016-6277 at all. Skipped the Karonte download entirely.
+- Found both exact firmware versions directly on Netgear's own KB
+  articles, with direct download URLs
+  (`downloads.netgear.com/files/GDC/R6400/R6400-V1.0.1.12_1.0.11.zip` and
+  `...V1.0.1.20_1.0.16.zip`). Downloaded both directly (curl, ~26-27MB
+  each, seconds not an hour), recorded sha256 checksums, unzipped —
+  confirmed real `.chk` firmware images with plausible dates (vulnerable:
+  May 2016, patched: Jan 2017), consistent with the CVE's disclosure
+  timeline.
+- Checked the patched version's release notes for direct confirmation:
+  mentions "Improves security protection on the device's web server" but
+  doesn't name CVE-2016-6277 or the `cgi-bin` endpoint explicitly (typical
+  for consumer release notes). Flagged this as suggestive, not
+  confirmation — the real proof has to come from actually diffing the
+  decompiled `cgi-bin`-handling binary between the two versions, same
+  rigor as every BusyBox sample, not from marketing text.
+- **Caught a real methodology gap before doing any binwalk/Ghidra work**:
+  the first draft of the Stage 7 plan had us manually locate the one
+  known-vulnerable function (Ghidra string search, same technique as the
+  BusyBox samples) and hand *that single function* to the LLM. This would
+  have made the phase almost a re-run of the calibration benchmark on an
+  uglier binary — it wouldn't test real discovery (the LLM would be told
+  exactly where to look, same as every BusyBox sample) and couldn't test
+  a cross-binary vulnerability at all (an isolated function has no "other
+  binary" to reason about). Corrected the plan: manual Ghidra work stays,
+  but only to establish ground truth to score against; what the LLM
+  actually gets shown is *every* function in the relevant binary (or
+  every function reachable from the web-request entry point), run through
+  the same command-injection prompt each time — a genuine discovery task,
+  scored on whether the real vulnerable function gets flagged and
+  everything else stays quiet. This is the "run the per-function prompt
+  over every function, not just the known one" idea that was explicitly
+  shelved as an optional stretch goal for the BusyBox benchmark — for this
+  phase it's not optional, it's the actual point of moving to real
+  firmware.
+- Updated `PLAN.md`'s Stage 7 to reflect both the corrected firmware
+  source (direct Netgear download, not Karonte) and the ground-truth vs.
+  LLM-task split, including that `run_benchmark.py`/`score.py` will need
+  a real extension later (currently assume one file per sample/variant,
+  not one file per function within a sample).
+- Next: `binwalk -e` both `.chk` files, locate the binary(ies) handling
+  `/cgi-bin/` requests. User is doing this step manually/hands-on going
+  forward rather than delegating each command.

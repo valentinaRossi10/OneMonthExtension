@@ -247,49 +247,86 @@ below).
 **Target**: CVE-2016-6277 — an unauthenticated command injection via
 `/cgi-bin/;<command>` on the Netgear R6400/R7000 router. Vulnerable
 firmware: R6400 v1.0.1.12. Fixed firmware: R6400 v1.0.1.20 (per Netgear's
-own advisory). If both versions are obtainable, this gives a real
-vulnerable/patched *firmware* pair, extending the existing
-vulnerable-vs-patched comparison methodology to vendor binaries instead
-of self-compiled ones. Firmware source: the Karonte dataset (49 real
-firmware images, Netgear/D-Link/TP-Link/Tenda — the same dataset
-MANGODFA evaluates against), or Netgear's own firmware archive directly
-if the exact versions are available there.
+own advisory). Both obtained directly from Netgear's official download
+servers (`downloads.netgear.com`), sha256-checksummed — **not** the
+Karonte dataset: checked its `config/NETGEAR/r_6400.json` first and it
+turned out to reference a different model/version (`R6400v2`, firmware
+`1.0.2.46`, already newer than even our fixed version), so it wouldn't
+have contained this CVE at all. Having a real vulnerable/patched
+*firmware* pair means the existing vulnerable-vs-patched comparison
+methodology extends to vendor binaries instead of self-compiled ones —
+same as before, just harder inputs.
 
 **Why this differs structurally from Stages 1-5** (see `firmware/README.md`
 once created): no source code exists, so there's no `samples/`/`ir/`
 equivalent — the pipeline starts directly from a compiled vendor binary.
-The vulnerability is also cross-binary (one binary sets a value via NVRAM,
-a different binary reads and unsafely uses it), unlike every BusyBox
-sample, which was a single self-contained function. Command injection
-also needs a new prompt template (`prompts/command-injection.md`) — none
-of the 5 existing memory-safety templates apply.
+It may also be a cross-binary vulnerability (not yet confirmed for this
+specific CVE — unlike every BusyBox sample, which was a known
+self-contained function). Command injection also needs a new prompt
+template (`prompts/command-injection.md`) — none of the 5 existing
+memory-safety templates apply.
+
+**Key methodology correction (caught before implementing): manual
+function-location is for ground truth only, not for what the LLM sees.**
+The first draft of this plan had us locate the one known-vulnerable
+function via Ghidra (string search etc., same technique as the BusyBox
+samples) and hand *that* to the LLM — which would have made this phase
+almost a copy of the calibration benchmark, just on an uglier binary. It
+would test nothing new: not real discovery (the LLM would be told exactly
+where to look, same as every BusyBox sample), and it couldn't test a
+cross-binary vulnerability at all, since an isolated function has no
+"other binary" to reason about. Corrected split:
+- **Manual Ghidra work** (as before): locate the real vulnerable code
+  ourselves, purely to establish ground truth to score against — including
+  determining whether it's actually cross-binary or not.
+- **What the LLM is given**: *not* the pre-isolated function. Every
+  function in the relevant binary (or every function reachable from the
+  web-request-handling entry point), run through the same
+  command-injection prompt each time — a genuine discovery/coverage task,
+  scored on whether it correctly flags the real vulnerable function and
+  stays quiet on everything else. This is the "run the per-function prompt
+  over every function, not just the known one" idea that was shelved as an
+  optional stretch goal for the BusyBox benchmark — here it's not
+  optional, it's the actual point of moving to real firmware.
+- If the vulnerability does turn out to be cross-binary, the prompt/task
+  needs real redesign (e.g. showing two related binaries together, or a
+  taint-style multi-step prompt) — genuinely new work, not a reuse of the
+  single-function prompt shape.
 
 **No-redistribution policy**: vendor firmware is proprietary, unlike
 BusyBox (GPL, self-compiled). The repo will document exact download
 URLs + checksums for reproducibility, but will not commit the firmware
 images or the full `binwalk` extraction — only the small decompiled
-pseudo-C snippet actually analyzed (the same scope PANGOLIN/MANGODFA
+pseudo-C snippet(s) actually analyzed (the same scope PANGOLIN/MANGODFA
 themselves publish in their papers, not the underlying binaries).
 
 **Steps**:
-1. Confirm both firmware versions (1.0.1.12 vulnerable, 1.0.1.20 fixed)
-   are actually obtainable (Karonte dataset or Netgear's archive).
-2. `binwalk -e` both images, locate the vulnerable binary(ies) — not yet
-   known for certain; the CERT advisory names the endpoint
-   (`/cgi-bin/`) but not the internal binary name.
-3. Ghidra-decompile the vulnerable version, using the same
-   string-search/structural-matching techniques already practiced on the
-   BusyBox samples (real firmware is typically also stripped).
-4. Decompile the patched version, diff to confirm the located code
-   actually changed (same verification approach used for all 5 BusyBox
-   samples).
-5. Write `firmware/CVE-2016-6277-netgear-r6400/info.md`,
-   `pseudo-code/{vulnerable,patched}/`, and `index.csv`.
+1. ~~Confirm both firmware versions are obtainable.~~ Done — both
+   downloaded directly from Netgear, checksummed.
+2. `binwalk -e` both images, locate the binary(ies) that handle
+   `/cgi-bin/` requests — not yet known for certain; the CERT advisory
+   names the endpoint but not the internal binary name.
+3. Ghidra-decompile *the whole relevant binary* for both versions (not
+   just one function) — needed regardless, since we don't yet know which
+   function is the real vulnerable one until we look.
+4. Manually locate the real vulnerable function by diffing
+   vulnerable-vs-patched decompiled output (same verification rigor as
+   all 5 BusyBox samples) — this is the ground-truth step, kept separate
+   from what gets shown to the LLM later. Note whether it's single-binary
+   or cross-binary.
+5. Write `firmware/CVE-2016-6277-netgear-r6400/info.md` recording the
+   ground truth (which function, which binary/binaries, why), plus
+   `pseudo-code/{vulnerable,patched}/` containing *every* decompiled
+   function from the relevant binary (not just the known one) and
+   `index.csv`.
 6. Add `prompts/command-injection.md` and the matching entry in
    `scripts/bug_classes.py`.
-7. Run through the existing `run_benchmark.py`/`score.py` pipeline
-   unchanged (it's already generic over `samples/index.csv`-shaped
-   input; may need a small extension to also read `firmware/index.csv`).
+7. Extend `run_benchmark.py`/`score.py` to run the prompt across every
+   function in `pseudo-code/CVE-2016-6277-netgear-r6400/vulnerable/` (a
+   real change needed — the current scripts assume one file per
+   sample/variant, not one file per function within a sample), scoring
+   whether the real vulnerable function gets flagged and everything else
+   stays quiet.
 
 ### Explicitly out of scope for now: large-scale evaluation
 
