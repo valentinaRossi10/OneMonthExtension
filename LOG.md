@@ -1,1043 +1,239 @@
 # Action Log
 
-Running log of work done on this project, in reverse-chronological order.
-One entry per session/action — used to track progress against `PLAN.md`.
-
-## Format
-
-```
-## YYYY-MM-DD — short title
-- what was done
-- decisions made / open questions
-- next step
-```
+Chronological record of work done, for session-to-session continuity.
+For *why* decisions were made, see `PIPELINE.md`. For current
+stage/status, see `PLAN.md`. Does not reference git commit hashes.
 
 ---
 
-## 2026-07-11 — First CVE benchmark sample: CVE-2026-29004 (BusyBox)
+## 2026-07-11 — Samples 1-5: BusyBox CVE benchmark built
 
-- Searched NVD for memory-safety CVEs in BusyBox, found CVE-2026-29004
-  (udhcpc6 DHCPv6 client heap buffer overflow via DNS servers), with a
-  direct link to the fixing patch on GitHub.
-- Identified the fix ("udhcpc6: fix buffer overflow") and the version right
-  before it (the vulnerable version). Root cause: `option_to_env()` in
-  `networking/udhcp/d6_dhcpc.c` allocates the DNS server list buffer with
-  `xmalloc(4 + addrs * 40 - 1)` instead of `+ 1`, undersizing it relative to
-  the writes that follow (heap buffer overflow, CWE-131 → CWE-787/CWE-122).
-- Noted a second, later patch to the same function ("check the size of
-  D6_OPT_IAPREFIX option") is a separate, unrelated fix (different DHCPv6
-  option) — excluded from this sample.
-- Pulled `d6_dhcpc.c` at both the vulnerable and patched versions into
-  `samples/CVE-2026-29004-busybox/{vulnerable,patched}/d6_dhcpc.c`.
-  Verified with `diff` that only the expected lines differ (the `xmalloc`
-  fix plus two unrelated style-only changes on the same lines).
-- Added `samples/CVE-2026-29004-busybox/info.md` (CVE id, file, function,
-  line, bug class, description, references) and `samples/index.csv` (ground
-  truth row for scoring later).
-- Working on branch `W1/CVE-benchmark`, not yet committed.
+- **CVE-2026-29004** (heap buffer overflow, `option_to_env`,
+  `networking/udhcp/d6_dhcpc.c`): `xmalloc(4 + addrs*40 - 1)` undersizes
+  the DNS-server buffer relative to the writes that follow. Fix: `+ 1`.
+- **CVE-2021-42386** (use-after-free, `nvalloc`/`nvfree`,
+  `editors/awk.c`): custom pool allocator lets a freed variable's slot be
+  reused while a stale reference is still held. Fix: removes the pool
+  allocator entirely, replaced with plain `xzalloc`/`free` per variable —
+  structurally different from every other sample (no single vulnerable
+  function survives in the patched version).
+- **CVE-2017-15873** (integer overflow, `get_next_block`,
+  `archival/libarchive/decompress_bunzip2.c`): signed `int` overflow of
+  `runCnt`/`dbufCount` bypasses a bounds check. Fix: both changed to
+  `unsigned`.
+- **CVE-2021-42373** (NULL pointer dereference, `man_main`,
+  `miscutils/man.c`): missing check for a following page argument (e.g.
+  `man 1`). Fix: one-line `&& argv[1]` check.
+- **CVE-2021-42374** (out-of-bounds read, `unpack_lzma_stream`,
+  `archival/libarchive/decompress_unlzma.c`): a negative-position check
+  isn't re-validated after a later adjustment. Fix: re-checks after the
+  adjustment, bails to the error path if still negative.
+- Dropped 2 candidates: CVE-2023-42366 (no fixing commit exists upstream,
+  can't form a vulnerable/patched pair), CVE-2026-32094 (wrong language —
+  JS library, not BusyBox).
+- All 5 verified via direct `diff` against the real fixing commit before
+  writing `info.md`/`samples/index.csv`.
+- Generated LLVM IR for all 5 (`clang -emit-llvm -g -O0`), verified each
+  target function appears as a `define`. Two build issues fixed along the
+  way: stale `.config`/`autoconf.h` across commit checkouts (regenerate
+  every checkout), and BusyBox's own `-Os` silently overriding our `-O0`
+  and inlining away `get_next_block` (strip all `-O*` flags from the
+  captured build command before adding `-O0`).
 
-## 2026-07-11 — Second sample: CVE-2021-42386 (BusyBox, use-after-free)
+## 2026-07-11 — Mentor's 4 reference papers; branch `W1/format-exploration`
 
-- Investigated the "Unboxing BusyBox: 14 vulnerabilities" disclosure
-  (Claroty/JFrog) for a use-after-free candidate. Found CVE-2021-42386 in
-  the `awk` applet's custom pool allocator (`nvalloc`/`nvfree`).
-- Identified the fix (removal of the pool allocator, replaced with direct
-  alloc/free per variable) and the version right before it as the
-  vulnerable one. Root cause: reused pool slots could still be referenced
-  after being freed, when processing a crafted awk pattern.
-- Noted this sample's diff is much larger/structural (full rewrite of the
-  allocator) compared to the first sample's single-line fix — flagged in
-  `info.md` since it changes what the vulnerable/patched comparison looks
-  like for this pair.
-- Pulled `editors/awk.c` at both versions into
-  `samples/CVE-2021-42386-busybox/{vulnerable,patched}/awk.c`, verified via
-  diff. Added `info.md` and `samples/index.csv` row.
+- Mentor sent FirmAgent (NDSS'26), HermeScan (NDSS'24), MANGODFA
+  (USENIX Sec'24), PANGOLIN (USENIX Sec'26), suggested Ghidra/angr.
+- Read all 4: two paradigms found (raw-IR deterministic analysis vs.
+  LLM-on-pseudo-C) — see `PIPELINE.md` for the full reasoning. Emailed
+  the mentor asking which to pursue.
 
-## 2026-07-11 — Considered CVE-2023-42366, dropped
+## 2026-07-12 — Mentor's decision + methodology corrections
 
-- Found a heap-buffer-overflow candidate in `awk.c`'s `next_token` function
-  (BusyBox 1.36.1), file/line given directly by NVD.
-- Checked for a fixing commit: none found. Diffed the exact vulnerable code
-  between the 1.36.1 tag and current upstream master — identical, meaning
-  this CVE appears to still be unpatched upstream. Since no patched version
-  exists, it can't form a clean vulnerable/patched pair like the other
-  samples.
-- Decision: dropped rather than using as a vulnerable-only sample, to keep
-  all samples in the paired-comparison format and prioritize bug-class
-  variety with the remaining slots instead.
+- Mentor's reply: decompiled pseudo-code primary, IR/disassembly
+  fallback. Full quote and reasoning in `PIPELINE.md`.
+- Caught before implementing: compiling with debug symbols retained
+  would hand the LLM real variable names as a free hint, unrealistic vs.
+  real (stripped) firmware. Decision: strip all binaries before
+  decompiling.
+- Clarified that stripping (losing names) and decompiler "cleanup" (data
+  references rendering as bare addresses, dispatch tables rendering as
+  confusing loops) are separate problems — the 5 samples are small enough
+  that cleanup tooling likely isn't needed; confirmed true once real
+  output was checked (see 2026-07-13).
 
-## 2026-07-11 — Considered CVE-2026-32094, dropped
+## 2026-07-13 — Stage 3: compile, strip, decompile all 5 samples
 
-- Found while browsing NVD; a shell-escaping vulnerability in "Shescape", a
-  JavaScript library (BusyBox sh named only as one of the affected shells,
-  not the vulnerable component).
-- Dropped: wrong language (JS, not C — doesn't fit the clang/LLVM IR
-  pipeline) and wrong bug class (shell injection/escaping, not memory
-  safety).
+- Compiled all 5 vulnerable/patched pairs to real ELF objects, verified
+  target functions present (and `nvalloc` correctly absent from the
+  CVE-2021-42386 patched build).
+- Found `-ffunction-sections` leaves per-function section names
+  (`.text.option_to_env`) surviving `strip --strip-all` — a symbol table
+  gets removed but section names don't. Fixed with
+  `objcopy --rename-section`, verified clean via `nm`/`strings`.
+- **Relocation bug**: stripping *unlinked* `.o` files destroys their
+  relocation table (only resolved at link time), producing garbage
+  Ghidra output — diagnosed via `readelf -r` showing zero relocations.
+  Fix: build the full linked BusyBox executable first, then strip that.
+  Branched to `W1/linked-binaries` for the rebuild.
+- Rebuild hit two unrelated legacy-build issues (`networking/tc.c` vs.
+  modern kernel headers, `rdate`/`date` vs. removed `stime()`) — switched
+  from `make defconfig` (slow, builds everything) to a **minimal config**
+  (`make allnoconfig` + only the ~6 applets actually needed), which
+  avoided both issues and produced much smaller/faster binaries.
+- Added an automated check after every build: `nm` on BusyBox's own
+  unstripped intermediate to confirm the target function actually
+  compiled in. Caught a real bug: `CONFIG_UDHCPC6` silently depends on
+  `CONFIG_FEATURE_IPV6`, which `allnoconfig` disables — two binaries
+  built cleanly but were completely missing `option_to_env`. Fixed by
+  also enabling `CONFIG_FEATURE_IPV6`.
+- Confirmed BusyBox's own build already links+strips (no separate strip
+  needed) and that linked executables don't have the earlier
+  section-name leak at all (linker coalesces per-function sections).
+  Replaced the broken `.o` files in `binaries/` with the 10 verified
+  linked+stripped executables.
+- Built Stage 4-5 ahead of API keys: 5 prompt templates, `run_benchmark.py`,
+  `score.py`, `models.yaml` (initial placeholder model IDs).
+- Manually Ghidra-decompiled 4 of 5 samples via GUI, using string-literal
+  search + XREF-following to locate each target function in a
+  stripped/nameless binary (technique details: search for a string used
+  only inside the target function, e.g. `"bad lzma header"`; for
+  functions with no strings of their own, like `nvalloc`, locate a
+  neighboring function that does have one, then match by structural
+  shape). Confirmed each known fix visible in the decompiled diff.
 
-## 2026-07-11 — Samples 3-5: integer overflow, NULL deref, OOB read (BusyBox)
+## 2026-07-13/14 — Sample 5 (CVE-2026-29004) — two build config bugs found
 
-- Queried the NVD API for BusyBox CVEs filtered to memory-safety CWEs
-  (CWE-190, 120, 125, 191, 415, 416, 476, 401) to find class-variety
-  candidates, avoiding files/classes already covered (`awk.c` UAF,
-  `d6_dhcpc.c` heap overflow).
-- Selected and pulled three more paired vulnerable/patched samples:
-  - **CVE-2017-15873** (integer overflow, CWE-190) —
-    `archival/libarchive/decompress_bunzip2.c`, `get_next_block`. Signed
-    `int` overflow of `runCnt`/`dbufCount` (attacker-controlled via crafted
-    bzip2 input) bypasses a bounds check, causing an out-of-bounds write.
-    Fix changes the relevant variables to `unsigned`.
-  - **CVE-2021-42373** (NULL pointer dereference, CWE-476) —
-    `miscutils/man.c`, `man_main`. Missing check for a following page
-    argument when a section name is given (e.g. `man 1`) causes a NULL
-    deref. Fix adds an `&& argv[1]` check — a minimal one-line fix.
-  - **CVE-2021-42374** (out-of-bounds read, CWE-125) —
-    `archival/libarchive/decompress_unlzma.c`, `unpack_lzma_stream`. A
-    negative-position check isn't re-validated after a later adjustment,
-    allowing a read before the start of the output buffer on crafted LZMA
-    input. Fix re-checks the position after the adjustment.
-- All three verified via direct `diff` between vulnerable/patched files
-  before writing `info.md` and adding rows to `samples/index.csv`.
-- **Benchmark set now complete for this round: 5 samples, 5 distinct bug
-  classes** (heap buffer overflow, use-after-free, integer overflow, NULL
-  pointer dereference, out-of-bounds read). Still on branch
-  `W1/CVE-benchmark`, not yet committed.
-- Next: Stage 2 — generate LLVM IR (`.ll`) for all 5 samples with
-  `clang -emit-llvm -g -O0`, checking which ones compile standalone vs.
-  need more of BusyBox's build context pulled in.
+- `option_to_env` was hard to locate (binary contains every applet from
+  the shared minimal config, not just udhcpc6, so generic search
+  heuristics kept matching unrelated code). Found via string search on a
+  sibling function's unique string; the compiler had inlined that sibling
+  directly into `option_to_env` under `-Os`.
+- Vulnerable and patched decompiled **identically** — real bug: the fix
+  lives inside `case D6_OPT_DNS_SERVERS`, gated by
+  `#if ENABLE_FEATURE_UDHCPC6_RFC3646`, which the minimal config never
+  enabled. Fixed by adding that flag and rebuilding just these 2
+  binaries; added a stronger verification (`nm` for `sprint_nip6`, a
+  function only reachable from inside that specific branch) to catch this
+  class of bug in the future — a function can exist while a *branch
+  inside it* is still missing.
+- All 5 samples' pseudo-code complete after the rebuild (4 full pairs +
+  CVE-2021-42386's intentional vulnerable-only case).
 
-## 2026-07-11 — Stage 2: generated LLVM IR for all 5 samples
+## 2026-07-14 — Cross-product benchmark redesign; API-access email; Stage 7 planning begins
 
-- Confirmed standalone `clang -emit-llvm` fails on these files (missing
-  BusyBox-internal headers and config macros like `ENABLE_FEATURE_*`,
-  `IF_*`, which only exist once the source tree is configured).
-- Workflow that worked: clone BusyBox, checkout the target commit,
-  `make defconfig` to generate `include/autoconf.h`, then `make V=1
-  <file>.o` to capture the real compiler invocation (include paths,
-  defines) BusyBox's own build uses for that file. Adapted that command by
-  swapping `gcc ... -c -o file.o` for `clang -S -emit-llvm -g -O0 ... -o
-  file.ll`, dropping GCC-only flags clang doesn't recognize
-  (`-malign-data=abi`, `-fno-guess-branch-probability`).
-- Hit two issues worth remembering:
-  - Switching commits without regenerating `.config`/`autoconf.h` breaks
-    the build on older commits (Kconfig mismatch, `make` tries an
-    interactive `oldconfig` and aborts non-interactively). Fix: wipe and
-    regenerate the config after every checkout, not just once.
-  - The adapted command still contained the original build's `-Os`
-    (BusyBox default), which — appearing after our `-O0` — won and caused
-    optimization/inlining that silently removed a target function
-    (`get_next_block` vanished, inlined into its caller). Fix: strip all
-    `-O*` flags from the captured command before adding `-O0`, then
-    verified every target function was still present as a separate
-    `define` in the resulting IR.
-- Generated and verified vulnerable + patched `.ll` pairs for all 5
-  samples; confirmed each target function (`option_to_env`, `nvalloc`,
-  `get_next_block`, `man_main`, `unpack_lzma_stream`) appears as a `define`
-  in the expected file(s) — and confirmed `nvalloc` is correctly *absent*
-  from the CVE-2021-42386 patched IR, since the fix removed it entirely.
-- Copied results into `ir/<sample-name>/{vulnerable,patched}.ll` for all 5
-  samples. Still on branch `W1/CVE-benchmark`, not yet committed.
-- Next: Stage 3/4 — design prompt templates per bug class (memory safety
-  first) and start testing them against these `.ll` files manually via
-  chat UI, since API access isn't set up yet.
+- Redesigned `run_benchmark.py`/`score.py` to run every prompt against
+  every sample (not just matched pairs), so mismatched-prompt false
+  positives are visible, not just missed detections. New `category`
+  column (`true_positive`/`false_negative`/`true_negative`/
+  `false_positive`); verified with a hand-built dry run before trusting
+  it. Factored the bug-class↔prompt mapping into shared
+  `scripts/bug_classes.py`.
+- Emailed the mentor requesting API access; he'd mentioned "Fable"
+  (Anthropic) and "the latest model" (OpenAI) — updated
+  `scripts/models.yaml` to `claude-fable-5` and looked up OpenAI's
+  actual current flagship (`gpt-5.6-sol`) rather than guess.
+- Branched `W1/firmware-static-analysis`. Picked CVE-2016-6277 (Netgear
+  R6400/R7000 command injection) as the Stage 7 target — full reasoning
+  (why this CVE, why not the papers' scale, the ground-truth-vs-LLM-task
+  split, the binary-selection scoping question) is in `PIPELINE.md`.
+- Checked the Karonte dataset before downloading (~1hr) — its
+  `config/NETGEAR/r_6400.json` referenced a different model/version
+  already newer than our target fixed version, so it would not have
+  contained this CVE. Got both exact firmware versions directly from
+  Netgear instead (official download servers, sha256-checksummed).
+- Found and reconciled a leftover placeholder `firmware/README.md` from
+  before the CVE-benchmark pivot (described an abandoned RetDec
+  approach) — rewrote it to match the actual pipeline + no-redistribution
+  policy (raw firmware/extracted filesystems never committed, only
+  checksums + the decompiled pseudo-C snippets actually analyzed).
 
-## 2026-07-11 — Branch `W1/format-exploration`: mentor reply + code-format research
+## 2026-07-14 — Ground truth found on both sides: `netgear_commonCgi`
 
-- Received a reply from Prof. Luo (mentor) with 4 reference papers
-  (FirmAgent NDSS'26, HermeScan NDSS'24, MANGODFA USENIX Sec'24, PANGOLIN
-  USENIX Sec'26) and a suggestion to try Ghidra and angr — tools that
-  operate on binaries, not source, and produce different IR formats
-  (Ghidra: P-code; angr: VEX IR) than the LLVM IR used so far.
-- Read all 4 papers (saved in `papers-11July/`) to understand how prior
-  work represents code for analysis. Found two distinct paradigms:
-  - **Algorithmic/deterministic static analysis** (HermeScan, MANGODFA):
-    no LLM, built on angr/VEX IR, doing classical dataflow/taint tracking
-    (Reaching Definition Analysis, Sink-to-Source Analysis, Assumed
-    Nonimpact). IR suits this because the "analyzer" is a fixed algorithm
-    that needs precise, unambiguous, uniform low-level instructions — not
-    readability.
-  - **LLM-as-analyzer** (FirmAgent, PANGOLIN): LLM agents do the actual
-    vulnerability reasoning, and both feed the LLM **decompiled pseudo-C**
-    (via IDA Pro), not raw IR or assembly — PANGOLIN states directly that
-    pseudocode is easier for LLMs than assembly-level representations.
-    Both also apply a cleanup/normalization pass to raw decompiler output
-    before using it (PANGOLIN: rule-based regex substitution for
-    data-segment references and loop→switch-case rewriting; FirmAgent: a
-    separate LLM refinement call) — plain decompiler output isn't used
-    as-is.
-  - Since this project's design also uses an LLM as the analysis engine,
-    the LLM-as-analyzer paradigm (pseudo-C) is the closer precedent, not
-    the algorithmic one (raw IR) — but this is a real design decision, not
-    an obvious default, so it was raised with the mentor rather than
-    assumed.
-  - Also noted: none of the 4 papers deeply cover this project's bug-class
-    scope (UAF, integer overflow, NULL deref, OOB read) — they cluster on
-    command injection and stack buffer overflow. This project's 5-sample,
-    5-class benchmark is already broader on that front, worth keeping
-    regardless of which representation is chosen.
-- Identified 4 possible code representations for the next stage, all
-  reusable against the existing 5 vulnerable/patched sample pairs:
-  1. LLVM IR from source (current, done) — `clang -emit-llvm`.
-  2. VEX IR from binary, via angr — matches HermeScan/MANGODFA.
-  3. Ghidra P-code from binary — direct analogue of VEX IR, uses the
-     tool the mentor named.
-  4. Decompiled pseudo-code from binary, via Ghidra + a cleanup pass —
-     matches FirmAgent/PANGOLIN, closest to what the LLM-based papers
-     actually validated.
-- Emailed the mentor summarizing this paradigm split and asking which
-  representation to pursue next (pseudo-code / VEX IR-P-code / stay with
-  LLVM IR), rather than guessing and re-implementing later.
-- **This branch exists specifically to isolate this exploration.** If the
-  mentor's answer is "stay with LLVM IR," switch back to
-  `W1/CVE-benchmark` (or merge only this LOG entry) and continue Stage 3/4
-  there without carrying over any binary/Ghidra/angr-specific work. If the
-  answer favors pseudo-code, VEX IR, or P-code, continue implementation on
-  this branch instead.
-- Next: wait for mentor's reply, then either (a) discard/park this branch
-  and resume Stage 3/4 on `W1/CVE-benchmark` with LLVM IR, or (b) compile
-  the 5 samples to actual binaries and implement the chosen representation
-  (angr/VEX, Ghidra/P-code, or Ghidra/pseudo-code + cleanup) here.
+- Located the vulnerable function by tracing the real call chain from a
+  `"cgi-bin"` string search: `parse_http_request` (routes cgi-bin
+  requests around auth checks) → `handle_get` → `netgear_commonCgi`
+  (`FUN_00033e0c`). Confirmed the exact mechanism: for a URL with no `?`
+  query string, everything after `cgi-bin/` is `strcpy`'d unsanitized
+  into a 64-byte stack buffer, then spliced via `sprintf` into a shell
+  command string and run with `system()` — matches the real exploit
+  (`/cgi-bin/;<command>`) exactly, since `;` becomes a shell command
+  separator.
+- Located the same function in the patched binary (v1.0.1.20) via string
+  search on a unique debug-log string. Root cause **not removed** — the
+  fix adds a blocklist (rejects `;`, `` ` ``, `$`, `..`) and an allowlist
+  (permitted CGI names) in front of the same unsafe pattern. Worth
+  noting: the blocklist doesn't cover every shell metacharacter (`|`,
+  `&`, `>`, `<`).
+- Documented both sides in `firmware/CVE-2016-6277-netgear-r6400/info.md`
+  and saved the decompiled functions, with an explicit note that this is
+  ground truth for scoring only, not what the LLM gets shown (see
+  `PIPELINE.md`).
 
-## 2026-07-12 — Mentor's decision: decompiled pseudo-code, with IR/disassembly as fallback
+## 2026-07-15 — Bulk-exported all `httpd` functions; built the firmware benchmark scripts
 
-- Mentor's reply: start with **decompiled pseudo-code from the binary**
-  (matches option 4 / FirmAgent+PANGOLIN's paradigm). Explicit caveat:
-  some binaries use anti-decompilation techniques that cause the
-  decompiled pseudo-code to miss potentially vulnerable code — if that's
-  encountered, fall back to **IR or raw disassembly** for those cases.
-- Decision going forward: this branch (`W1/format-exploration`) is now the
-  active line of work — no need to switch back to `W1/CVE-benchmark`
-  unless a future case specifically forces a fallback to IR.
-- Implication for the pipeline: pseudo-code becomes the default
-  representation shown to the LLM, but the workflow should stay able to
-  regenerate IR (already have LLVM IR from Stage 2; VEX IR via angr and
-  Ghidra P-code are documented fallback options) or raw disassembly for
-  any sample where pseudo-code analysis fails or looks suspiciously
-  incomplete (e.g. missing/garbled logic around a known vulnerable
-  function).
-- Next: compile the existing 5 vulnerable/patched sample pairs to actual
-  binaries (same commits, same build-flag approach as Stage 2 but without
-  `-emit-llvm`), install/set up Ghidra, decompile each to pseudo-C, assess
-  whether a cleanup pass (data-segment resolution, etc., per
-  PANGOLIN/FirmAgent) is actually needed for these specific
-  functions before building one, then resume Stage 3/4 (prompt design +
-  manual benchmark) using pseudo-code as the primary input.
+- Wrote a headless Ghidra script to decompile every function above a
+  minimum size (filters obvious thunks/tiny stubs) — hit and fixed a
+  chain of real issues:
+  1. `-process httpd` needs `-recursive` (program is nested in a project
+     folder, not the root).
+  2. Ghidra 12.1.2 dropped Jython `.py` script support (PyGhidra only,
+     needs a separate Python runtime) — rewrote in Java
+     (`scripts/ghidra/ExportAllFunctions.java`), which needs no extra
+     runtime.
+  3. Both binaries are named `httpd` — local Ghidra projects can't scope
+     `-process` to one folder (only by filename; confirmed by reading the
+     actual headless docs). Fixed by having the script write output into
+     a subfolder named after each program's real project path.
+  4. First real run showed correct logic but opaque `DAT_xxxxx`
+     placeholders instead of resolved string literals. Wrong first
+     diagnosis (`-noanalysis` reusing incomplete analysis — re-running
+     with full analysis from scratch did *not* fix it). Real cause: the
+     script never set the decompiler's simplification style; the GUI
+     always uses the full "decompile" style, a bare scripted
+     `DecompInterface` can default to a less thorough one. Fixed with
+     explicit `DecompileOptions` + `setSimplificationStyle("decompile")`.
+     Re-verified against the hand-saved ground truth: identical content
+     (whitespace-only diff) — and as a bonus, two functions that had
+     previously timed out during decompilation (including the giant
+     `parse_http_request`) now succeeded too.
+- **Final export: 1004 vulnerable + 1007 patched functions**, kept
+  outside the git repo (same place as the raw firmware — regeneratable,
+  ~2000 auto-generated files not worth committing).
+- Confirmed the existing `run_benchmark.py`/`score.py` can't handle this
+  (different iteration shape — many function-files per binary, not one
+  file per sample/variant) and built dedicated versions:
+  `scripts/run_benchmark_firmware.py` (reuses `call_model`/`build_prompt`
+  from the original, resumable, command-injection prompt only — running
+  the full 5-prompt cross-product at this scale would be ~5x the cost for
+  little added value) and `scripts/score_firmware.py` (reads a new
+  `ground_truth.csv`, since the same logical function has a *different*
+  address in each binary due to different compiler layout). Added
+  `prompts/command-injection.md`. Verified `score_firmware.py`'s
+  categorization with a hand-built dry run before trusting it.
 
-## 2026-07-12 — Methodology correction: strip binaries before decompiling
+## 2026-07-15 — API budget: mentor's reply, cost estimates, staged spending plan
 
-- Caught an issue before implementing: the plan to compile the 5 samples
-  with debug symbols retained (`-g`) would give the LLM real, human-chosen
-  variable/function names (`addrs`, `dlist`, `runCnt`) in the decompiled
-  pseudo-code. That's not representative of the actual problem — real
-  deployed IoT firmware (what FirmAgent and PANGOLIN both extract via
-  `binwalk`, and what this project ultimately targets) ships **stripped**
-  binaries with no debug info, which is exactly why those papers'
-  decompilers only recover generic names (`local_1c`, `iVar1`, `param_1`)
-  and why they needed extra LLM-refinement/regex cleanup steps in the
-  first place. Compiling with symbols retained would hand the LLM a hint
-  unrelated to actual vulnerability reasoning and inflate detection
-  numbers in a way that wouldn't transfer to real firmware.
-- Decision: compile the 5 samples normally, then **strip** the resulting
-  binaries (`strip <binary>`) before decompiling with Ghidra, matching
-  real firmware conditions and FirmAgent/PANGOLIN's actual setup. This
-  is now the default/primary pipeline.
-- Noted as a possible secondary experiment (not a replacement for the
-  above): also decompiling the *unstripped* versions and comparing
-  detection accuracy against the stripped versions would isolate how much
-  naming/symbol information affects LLM-based detection — a measurement
-  neither FirmAgent nor PANGOLIN isolated. Worth doing only after the
-  primary (stripped) benchmark is working.
-- Next: proceed with compiling all 5 samples to binaries, `strip` each,
-  install Ghidra, decompile the stripped binaries to pseudo-C, then check
-  whether a cleanup pass is actually needed before building one
-  preemptively.
-
-## 2026-07-12 — Clarified: stripping vs. the actual "cleanup" problem
-
-- Went back to check whether the stripping decision (above) reopens the
-  need for PANGOLIN/FirmAgent-style cleanup, which was earlier deprioritized
-  on the assumption that debug symbols would be retained. Conclusion: these
-  are two separate issues, and stripping only affects one of them.
-  - **Stripping's effect**: loses readable variable/function names —
-    Ghidra will auto-generate placeholders (`local_1c`, `param_1`,
-    `iVar1`). This is expected and *not* something cleanup fixes — it's
-    an inherent, accepted property of analyzing a stripped binary (exactly
-    matching FirmAgent/PANGOLIN's real target binaries, which also never
-    had recoverable names). The LLM can still reason about generically
-    named variables; this is a readability cost being deliberately
-    accepted for realism, not a defect.
-  - **The actual cleanup problem** (opaque data-segment references
-    rendering as bare addresses instead of resolved string/constant
-    content; loop-based indirect-call dispatch tables rendering as
-    confusing loops instead of switch/case) is driven by what the code
-    *does*, not by whether it's stripped. A stripped binary with simple,
-    straightforward logic can still decompile cleanly on both fronts; a
-    symbol-rich binary with a dispatch table would have the same problem.
-- Since the 5 samples are small, self-contained functions with no
-  route-dispatch-style logic, the earlier plan still holds unchanged:
-  generate pseudo-C from the stripped binaries, read the actual output,
-  and only build cleanup tooling for the two specific problems above if
-  they actually appear — expect uglier variable names than hoped, but
-  that alone doesn't imply the full regex/data-resolution machinery is
-  needed.
-
-## 2026-07-13 — Stage 3: compiled and stripped all 5 samples to binaries
-
-- Compiled all 5 vulnerable/patched commit pairs to real ELF relocatable
-  objects (`.o`, via BusyBox's own captured build command — same commits
-  and config-regeneration approach as Stage 2's IR build, but without
-  `-emit-llvm`, i.e. actual `gcc` compilation). Verified via `nm` that
-  each target function (`option_to_env`, `nvalloc`, `get_next_block`,
-  `man_main`, `unpack_lzma_stream`) is present in the expected file(s),
-  and correctly absent from CVE-2021-42386's patched object (`nvalloc`
-  removed by the fix, same as the IR check in Stage 2).
-- Stripped all 10 objects: `strip --strip-all`.
-- Caught a second, more subtle information leak before finishing: BusyBox
-  compiles with `-ffunction-sections`, so each function lives in its own
-  ELF section (e.g. `.text.option_to_env`). `strip --strip-all` removes
-  the *symbol table* but does **not** remove section names — so even a
-  "stripped" object still had the vulnerable function's name sitting
-  directly in its section headers, undermining the whole point of
-  stripping (avoiding handing the LLM a free hint). Fixed by renaming
-  every per-function `.text.<fn>` / `.data.<fn>` / `.rodata.<fn>` section
-  to its generic form (`.text`, `.data`, `.rodata`) via
-  `objcopy --rename-section`, then re-verified with `nm` (no symbols) and
-  `strings` (no target function names anywhere in the file) across all 10
-  objects — all clean.
-- Copied results into `binaries/<sample-name>/{vulnerable,patched}.o` for
-  all 5 samples, with a `binaries/README.md` documenting the build +
-  strip + section-anonymization steps and why each was necessary.
-- Next: install Ghidra, decompile each stripped `.o` to pseudo-C (headless
-  analyzer + decompiler script), then inspect the output by eye before
-  deciding whether any cleanup pass is actually needed (per the 2026-07-12
-  clarification above).
-
-## 2026-07-13 — Diagnosed and started fixing a relocation bug in Stage 3's binaries
-
-- While trying Ghidra on the stripped `man_main` object, the decompiler
-  output was heavily garbled (warnings like "Removing unreachable block",
-  "Read-only address is written"). `readelf -r` showed the stripped `.o`
-  had **zero relocation entries**. Root cause: the Stage 3 binaries were
-  compiled but never *linked* — they're relocatable objects (`.o`, ELF
-  type `ET_REL`) whose call targets and data references are only resolved
-  at link time via relocations. Stripping an unlinked `.o` destroys the
-  symbol table those relocations depend on, but since linking never
-  happened, the addresses were never resolved either — Ghidra was handed
-  garbage placeholder bytes instead of real instructions.
-- Fix: build the **full linked BusyBox executable** per commit (real
-  `make`, not a single-file compile), then strip *that* — safe, because by
-  link time all relocations are already resolved into real addresses; only
-  symbol names disappear, not the instructions.
-- Branched to `W1/linked-binaries` to do this rebuild, keeping
-  `W1/CVE-benchmark`'s Stage 3 output untouched in case this direction
-  needs reverting.
-- Hit two more build issues in the full-BusyBox build (unrelated to any of
-  the 5 samples): `networking/tc.c` fails against modern kernel headers
-  (missing legacy CBQ traffic-control structs) — fixed by disabling
-  `CONFIG_TC`; `rdate`/`date` fail with undefined reference to `stime()`
-  (removed from glibc) for the bunzip2 commits specifically.
-- Rather than keep disabling individual broken legacy applets one at a
-  time on top of `make defconfig` (which builds every applet, slow and
-  fragile), switched to a **minimal config**: `make allnoconfig` plus
-  enabling only the ~5 applets each sample actually needs
-  (`CONFIG_BUNZIP2`, `CONFIG_BZCAT`, `CONFIG_UNLZMA`, `CONFIG_AWK`,
-  `CONFIG_MAN`, `CONFIG_UDHCPC6`). Confirmed this works: the two bunzip2
-  builds redone this way produced valid, much smaller binaries (~128KB vs
-  ~1.2MB under defconfig) with `get_next_block` present in both.
-- All 10 full linked binaries now build successfully. Still to do:
-  `strip --strip-all` each one, re-check/re-apply the
-  `-ffunction-sections` section-rename fix from the earlier Stage 3 entry
-  (BusyBox still compiles with that flag, so linked binaries likely have
-  the same per-function section-name leak), verify clean with `nm`/
-  `strings`, then copy into `binaries/` replacing the old broken `.o`
-  files and update `binaries/README.md`.
-
-## 2026-07-13 — Finished the linked-binary rebuild; Stage 3 binaries done
-
-- The scratchpad holding the first 10 linked binaries was wiped between
-  sessions (this has happened before), so the rebuild had to start over.
-  Only one sample (CVE-2026-29004) had its exact commit SHAs recorded in
-  `info.md`; re-derived the other 4 samples' exact vulnerable/fixing
-  commits by pickaxe-searching BusyBox's full git history for unique code
-  fragments from each sample's already-saved source, then confirmed every
-  vulnerable/patched pair byte-for-byte matches what's already committed
-  in `samples/` before rebuilding — all 4 matched exactly, so the rebuild
-  targets the same ground truth as before, just re-derived from history
-  instead of a saved note.
-- Rebuilt all 10 with the minimal-config approach from the previous
-  entry, this time adding an automated check: after each build, `nm` on
-  BusyBox's own unstripped intermediate (`busybox_unstripped`) to confirm
-  the sample's target function actually made it into the binary (or, for
-  CVE-2021-42386's patched build, confirm `nvalloc` is correctly absent,
-  same exception as the Stage 2 IR check).
-- That check caught a real bug on the first rebuild attempt: two binaries
-  (the CVE-2026-29004 pair) built "successfully" with no errors but were
-  completely missing `option_to_env` — the whole `udhcpc6` applet hadn't
-  been compiled in. Root cause: `CONFIG_UDHCPC6` depends on
-  `CONFIG_FEATURE_IPV6`, which `allnoconfig` disables by default; simply
-  enabling `CONFIG_UDHCPC6=y` in `.config` without also enabling its
-  dependency silently produced a binary without the applet at all, no
-  build failure to signal it. This is exactly the kind of silent failure
-  the automated `nm` check exists to catch — without it, this could have
-  gone unnoticed all the way into a garbled/empty Ghidra decompilation
-  and wasted more time misdiagnosed as another Ghidra-side issue. Fixed
-  by also enabling `CONFIG_FEATURE_IPV6=y`; reran and all 10 builds now
-  pass the per-function verification.
-- Confirmed BusyBox's own build system already links `busybox_unstripped`
-  down to a stripped `busybox` as its final step (no separate strip
-  needed), and that a fully linked executable doesn't have the earlier
-  `-ffunction-sections` section-name leak at all — the linker coalesces
-  all per-function `.text.<fn>` sections from the individual `.o` files
-  into a single `.text` section in the final binary. Ran `strip
-  --strip-all` again anyway for clarity/documentation. Verified all 10
-  clean via `nm` (no symbols), `readelf -S` (no per-function sections),
-  and `strings` (no target function names or source filenames anywhere).
-- Replaced the old broken unlinked-and-stripped `.o` files in `binaries/`
-  with these 10 verified linked-and-stripped executables
-  (`binaries/<sample>/{vulnerable,patched}`, no `.o` extension since
-  they're now real executables, not objects). Updated `binaries/README.md`
-  to describe the corrected pipeline and both bugs caught along the way.
-- **Stage 3 is now complete and correct.** Next: install/use Ghidra to
-  decompile these 10 binaries to pseudo-C, producing
-  `pseudo-code/<sample>/{vulnerable,patched}.c` for the Stage 4/5
-  automation scripts (`scripts/run_benchmark.py` already looks for these
-  first, falling back to `ir/` if absent).
-
-## 2026-07-13 — Stage 4-5: built prompt templates and benchmark automation scripts
-
-- Built ahead of having API keys, per explicit decision to start on the
-  "full matrix" automated version now (all samples × all bug-class
-  prompts × all configured models) rather than waiting for keys or
-  building a minimal single-model version first.
-- `prompts/`: one template per bug class, covering all 5 memory-safety
-  classes in `samples/index.csv` (`memory-buffer-overflow.md`,
-  `memory-use-after-free.md`, `memory-integer-overflow.md`,
-  `memory-null-pointer-dereference.md`, `memory-out-of-bounds-read.md`).
-  Each names the specific pseudo-C-level pattern for its bug class, states
-  what *not* to flag (to keep cross-template scoring clean), and requests
-  a structured, regex-parseable response format.
-- `scripts/run_benchmark.py`: for every sample × variant
-  (vulnerable/patched) × model in `scripts/models.yaml`, finds
-  `pseudo-code/<sample>/<variant>.c` if it exists (primary representation)
-  else falls back to `ir/<sample>/<variant>.ll`, builds the matching
-  prompt, calls the Anthropic or OpenAI SDK, and saves raw output to
-  `results/runs/<cve_id>__<variant>__<model>.md`.
-- `scripts/score.py`: parses every file under `results/runs/`, extracts
-  the `Vulnerable: yes/no` line, compares against the expected verdict
-  (yes for vulnerable, no for patched), writes `results/scoring.csv`
-  (cve_id, bug_class, model, variant, expected, actual, hit,
-  false_positive), and prints overall accuracy.
-- `scripts/models.yaml`: lists models to benchmark — `claude-sonnet-5` and
-  `claude-opus-4-8` on the Anthropic side; the OpenAI side is a
-  placeholder (`REPLACE_ME_CONFIRM_WITH_MENTOR`) pending mentor
-  confirmation of the exact model ID (question raised in an earlier email,
-  still unanswered). `run_benchmark.py` skips placeholder entries with a
-  warning instead of failing.
-- Updated `scripts/README.md`, `prompts/README.md`, `results/README.md`
-  to match what actually got built (they previously described an
-  IR-centric, manual-only workflow left over from before the mentor's
-  pseudo-code decision), and added API key setup instructions
-  (Anthropic console / OpenAI platform key pages, `ANTHROPIC_API_KEY` /
-  `OPENAI_API_KEY` env vars) since no keys are configured yet.
-- Not yet run end-to-end: no API keys configured yet, and `pseudo-code/`
-  doesn't exist yet (blocked on finishing the linked-binaries rebuild
-  above), so a real run today would silently use the `ir/` fallback for
-  all 5 samples.
-
-## 2026-07-13 — Manual Ghidra decompilation: workflow and first 3 samples
-
-- Started manually decompiling the 10 binaries in `binaries/` with
-  Ghidra's GUI (`CodeBrowser`), one function at a time, per the pipeline
-  documented in `pseudo-code/README.md` (new file).
-- Locating each target function in a stripped binary needed different
-  techniques per sample, since there are no symbol names to search for:
-  - **String-literal anchor** (fastest, used for `man_main`,
-    `unpack_lzma_stream`, `nvfree`): search for a string used nowhere else
-    in the source but inside the target function (e.g.
-    `"MANDATORY_MANPATH"`, `"bad lzma header"`, `"Internal error"`), then
-    follow Ghidra's XREF from the string to its calling function.
-  - **Shared-global-reference chaining** (used for `nvalloc`, which has no
-    strings of its own): found `nvfree` via its unique string first, then
-    located `nvalloc` by checking which nearby function shares the same
-    global block-list state and matches the expected shape (single `int`
-    parameter, loop over `pos`/`size`/`nv` arithmetic, conditional
-    allocation, zeroing loop) — confirmed against the real source's struct
-    math (`MINNVBLOCK` = 64 = `0x40` showing up as the exact immediate
-    constant in the decompiled comparison).
-  - Address-adjacency (assuming the compiler kept source-order layout) was
-    tried first for `nvalloc` and **failed** — the function immediately
-    before `nvfree` by address turned out to be an unrelated helper, not
-    `nvalloc`. Not a reliable heuristic on its own; only used the
-    structural/reference-based checks above as ground truth.
-  - Several functions weren't recognized as functions by Ghidra's
-    auto-analysis at all (shown as `LAB_...`/decompiled ad-hoc as
-    `UndefinedFunction_<addr>` instead of `FUN_...`) — fixed per-function
-    with `Create Function` at the correct address once located via the
-    Listing view.
-- Saved and verified 3 of 5 samples so far, confirming the known fix is
-  visible in each vulnerable/patched decompiled diff:
-  - `CVE-2021-42373` (`man_main`): fix shows up as an added
-    `|| (plVar12[1] == 0)` condition — matches the real `&& argv[1]` fix.
-  - `CVE-2021-42374` (`unpack_lzma_stream`): fix shows up as a re-check
-    `(int)pos < 0` added after the adjustment, jumping to the
-    `"corrupted data"` error path if still negative — matches the real
-    fix exactly.
-  - `CVE-2021-42386` (`nvalloc`): **vulnerable side only, intentionally.**
-    The fix removes `nvalloc`/`nvfree` entirely rather than patching them,
-    so there is no equivalent "patched `nvalloc`" to decompile. Documented
-    in detail in `pseudo-code/README.md`. `scripts/run_benchmark.py`
-    already handles this correctly via its existing IR-fallback logic —
-    it'll use `ir/CVE-2021-42386-busybox/patched.ll` for that variant
-    automatically, no script changes needed.
-- Remaining: `get_next_block` (bunzip2, CVE-2017-15873) and
-  `option_to_env` (udhcpc6, CVE-2026-29004) — both need the
-  size-sort/call-graph approach since neither has a usable string anchor.
-
-## 2026-07-13 — Sample 4 done (get_next_block); found a real bug in sample 5's binaries
-
-- `CVE-2017-15873` (`get_next_block`, bunzip2): located via `Window →
-  Functions` sorted by size, confirmed unambiguously by the presence of
-  bzip2's actual magic numbers (`0x177245`/`0x385090` = digits of √2,
-  `0x314159`/`0x265359` = digits of π, used for end-of-stream/new-block
-  markers) and by finding the exact vulnerable bounds check
-  (`if (iVar17 < iVar6 + local_774) goto ...`, matching
-  `dbufCount + runCnt > dbufSize`) with both operands declared `int`. The
-  patched version's fix is clearly visible: the same check becomes an
-  explicit `(uint)` comparison, with `dbufCount`/the run-length multiplier
-  promoted to `uint` and the cached signed `dbufSize` local removed
-  entirely in favor of re-reading `param_1[0x12]` with an explicit
-  `(uint)` cast at each use — exactly the "changed the relevant variables
-  to unsigned" fix described in `info.md`. Both saved.
-- `CVE-2026-29004` (`option_to_env`, udhcpc6): took several wrong turns
-  before landing on the right function, because this binary — like all
-  10 — contains every applet from the shared minimal build config (man,
-  awk, bunzip2, unlzma, udhcpc6 all together, not just the one relevant
-  applet per sample), so generic heuristics like "self-recursive
-  function" or a string search on a *shared* global matched unrelated
-  code from other applets first (awk's AST-size walker, then what turned
-  out to be ash/hush shell option-parsing code). Eventually found it by
-  searching for `"option data exceeds option length"` (a string that
-  belongs to a sibling function, `string_option_to_env`) and discovering
-  the compiler had **inlined `string_option_to_env` directly into
-  `option_to_env`** under `-Os` (it was only called from one call site),
-  so there was really only one function to find, not two — explains the
-  earlier confusion. Confirmed via the self-recursive call
-  (`option_to_env(param_1+0x10, ...)` matching the `D6_OPT_IA_PD`/`IA_NA`
-  recursion) and the IAADDR/IAPREFIX case bodies.
-- **Bug found comparing vulnerable vs. patched**: the two decompiled
-  `option_to_env` functions came back byte-for-byte identical. Checked
-  the real source diff directly — the actual fix
-  (`xmalloc(4 + addrs * 40 - 1)` → `xmalloc(4 + addrs * 40 + 1)`, plus two
-  `!= 0` loop-condition changes) lives inside `case D6_OPT_DNS_SERVERS`,
-  which is wrapped in `#if ENABLE_FEATURE_UDHCPC6_RFC3646`. The minimal
-  build config only enabled `CONFIG_UDHCPC6` + its `CONFIG_FEATURE_IPV6`
-  dependency, never `CONFIG_FEATURE_UDHCPC6_RFC3646` — so that entire
-  branch, including the actual bug, was never compiled into either
-  binary. Both binaries contain a real, legitimately-decompiled
-  `option_to_env` — it's just missing the one branch that matters for
-  this CVE.
-- This is a real blind spot in Stage 3's automated build verification:
-  the `nm`-based per-sample check (added after the earlier `FEATURE_IPV6`
-  incident) only confirms the target *function* is present, not that a
-  specific *branch inside it* survived preprocessing. A function can
-  exist and still be missing its bug if a narrower feature flag gates
-  just that branch. Documented in `pseudo-code/README.md` as a "known
-  bug, not yet fixed" so it isn't lost, along with the exact fix needed:
-  add `CONFIG_FEATURE_UDHCPC6_RFC3646=y`, rebuild only the 2
-  `CVE-2026-29004-busybox` binaries (the other 8 samples are unaffected —
-  none of their fixes sit behind an additional feature flag beyond what's
-  already enabled), verify the DNS-servers branch actually compiled in
-  this time (e.g. check for a reference to `sprint_nip6`, only called
-  from within that branch), then redo this sample's Ghidra decompilation.
-- **Committed as-is for the day**: 4 of 5 samples' pseudo-code done and
-  verified (`CVE-2021-42373`, `CVE-2021-42374`, `CVE-2021-42386`
-  vulnerable-only, `CVE-2017-15873`). `CVE-2026-29004` saved but flagged
-  unusable until the rebuild above happens — do not run the benchmark
-  against it in its current state.
-
-## 2026-07-14 — Fixed CVE-2026-29004: rebuilt with the missing config flag
-
-- Added `CONFIG_FEATURE_UDHCPC6_RFC3646=y` to the minimal build config
-  (its only dependency, `CONFIG_UDHCPC6`, was already enabled) and
-  rebuilt just the 2 `CVE-2026-29004-busybox` binaries — the other 8 were
-  unaffected by this gap and didn't need touching.
-- Extended the per-sample verification for this rebuild beyond the
-  existing "target function present" `nm` check: also confirmed
-  `sprint_nip6` (a function only called from inside the
-  `D6_OPT_DNS_SERVERS` branch) is present in `busybox_unstripped` for
-  both binaries — proof the specific vulnerable branch actually compiled
-  in this time, not just the surrounding function.
-- Re-stripped and re-verified clean the same way as the other 9 binaries
-  (`nm`: no symbols, `readelf -S`: no per-function sections, `strings`:
-  no leaked function/file names). Replaced
-  `binaries/CVE-2026-29004-busybox/{vulnerable,patched}` in the repo.
-- Re-decompiled `option_to_env` in Ghidra for both binaries. This time
-  vulnerable and patched differ exactly where expected: inside the
-  `D6_OPT_DNS_SERVERS` case, the allocation size changes from
-  `(addrs >> 4... ) * 0x28 + 3` to `* 0x28 + 5` — the decompiled/optimized
-  form of `xmalloc(4 + addrs*40 - 1)` → `xmalloc(4 + addrs*40 + 1)`
-  (constant-folded: `4 - 1 = 3`, `4 + 1 = 5`). Confirms the fix is
-  correctly represented now. Saved both files, overwriting the earlier
-  (incomplete) vulnerable-only save.
-- **All 5 samples are now complete**: 4 full vulnerable/patched pairs
-  (`CVE-2026-29004`, `CVE-2021-42373`, `CVE-2021-42374`,
-  `CVE-2017-15873`) plus `CVE-2021-42386`'s intentional vulnerable-only
-  case (fix removes the function entirely; `run_benchmark.py` falls back
-  to IR for that one variant). Stage 3 (compile/strip/decompile) is done.
-- Updated `pseudo-code/README.md` and `binaries/README.md` to mark this
-  resolved rather than in-progress.
-- Next: no API keys yet, so Stage 5 (actually running
-  `scripts/run_benchmark.py`/`scripts/score.py`) is still blocked on
-  that. Otherwise the full pipeline (samples → IR → binaries → pseudo-code
-  → prompts → scripts) is complete and ready to run end-to-end once keys
-  are available.
-
-## 2026-07-14 — Redesigned the benchmark as a full prompt x sample cross-product
-
-- Raised a methodology question before running anything for real: the
-  original `run_benchmark.py` only ran each sample against its own
-  matching bug-class prompt (e.g. the NULL-deref sample only ever saw the
-  NULL-deref prompt). That only measures "can it find the bug when told
-  exactly what to look for" — it never tests whether a prompt stays quiet
-  on code that doesn't have that bug class, so mismatched-prompt false
-  positives (and the model's ability to correctly say "no, that's not
-  this bug class") were never exercised. Decided to run every prompt
-  template against every sample instead, not just matched pairs.
-- Factored the `bug_class -> prompt filename` mapping out of
-  `run_benchmark.py` into a new shared `scripts/bug_classes.py`, imported
-  by both `run_benchmark.py` and `score.py`, so the two can't drift apart
-  on which prompt "should" match which sample.
-- `run_benchmark.py`: now loops sample × variant × **every prompt in
-  `ALL_PROMPT_FILES`** × model (previously just sample × variant ×
-  model). Output filenames gained a 4th component:
-  `<cve_id>__<variant>__<model>__<prompt-slug>.md`. With 9 valid
-  sample/variant pairs (`CVE-2021-42386` patched has no code file, by
-  design), 5 prompts, and N models, that's `9 x 5 x N` calls — 90 for 2
-  models.
-- `score.py`: rewrote the expected-answer logic for the cross-product —
-  a prompt should only say "yes" if the code is the vulnerable variant
-  *and* the prompt's bug class actually matches the sample's real bug
-  class (checked via `bug_classes.BUG_CLASS_TO_PROMPT`); every other
-  combination should say "no." Replaced the old binary
-  hit/false_positive columns with a `category` column
-  (`true_positive`/`false_negative`/`true_negative`/`false_positive`) so
-  a "matching prompt found the real bug" is clearly distinguishable from
-  a "mismatched prompt hallucinated a bug that isn't there." Also prints
-  a per-category breakdown, a specialized-prompt detection rate, and
-  lists every false positive with its reason (patched code flagged vs.
-  wrong bug class hallucinated).
-- Verified the new scoring logic with a small dry run using hand-written
-  fake result files before trusting it: confirmed a matched
-  vulnerable-variant "yes" scores `true_positive`, and a mismatched
-  prompt saying "yes" on the same vulnerable file correctly scores
-  `false_positive` with the right reason. Deleted the test fixtures
-  afterward.
-- Added `.gitignore` (`__pycache__/`, `*.pyc`, `.venv/`) — hadn't been
-  needed until Python scripts started actually being imported/run
-  locally.
-- Updated `scripts/README.md`, `results/README.md`, and `PLAN.md`'s
-  Stage 5 section to describe the cross-product design and the new
-  `scoring.csv` columns.
-- Still blocked on API keys to actually run this for real.
-
-## 2026-07-14 — Emailed mentor for API access; branched for the real-firmware phase
-
-- Drafted and sent an email to the mentor requesting API access (he had
-  mentioned providing it earlier but no keys have arrived yet), and asked
-  him to confirm the exact model IDs. He'd mentioned "Fable" for
-  Anthropic and "the latest model" for OpenAI during our conversation —
-  updated `scripts/models.yaml` accordingly: `claude-fable-5` (replacing
-  the two earlier placeholder Claude IDs), and looked up OpenAI's actual
-  current flagship (`gpt-5.6-sol`, released this month) rather than leave
-  a placeholder, since "latest" isn't a pinned model ID — still worth
-  the mentor confirming this is specifically what he meant.
-- While waiting on the reply, started planning the next phase: moving
-  from the self-compiled BusyBox benchmark to real, unmodified firmware,
-  using binwalk + Ghidra (the mentor's original suggestion, and the
-  actual approach in all 4 reference papers). Branched to
-  `W1/firmware-static-analysis` for this planning work, off
-  `W1/linked-binaries` (clean tree, nothing uncommitted).
-- Worked through what actually changes vs. the BusyBox benchmark, since
-  the two could look superficially redundant: the benchmark validated the
-  *methodology* (decompile → prompt → score) on binaries we fully
-  controlled (self-compiled, x86-64, single self-contained functions,
-  memory-safety only). Real firmware introduces several genuinely
-  untested variables at once — unfamiliar toolchain/architecture
-  (ARM/MIPS, vendor compilers), a different bug class (command injection,
-  not memory safety — and what the reference papers actually center on),
-  cross-binary vulnerabilities (one binary sets shared state, a different
-  binary unsafely uses it — the specific hard problem
-  Karonte/MANGODFA/SaTC exist to solve), and the binary-discovery step
-  itself (in the benchmark we always already knew which file/function to
-  target; with real firmware, finding the right binary among everything
-  `binwalk` extracts is itself untested).
-- Checked all 4 papers' actual evaluation scale directly (pulled from
-  their abstracts, not memory) to calibrate expectations honestly:
-  FirmAgent (14 firmware, 182 vulns/140 new/17 CVEs), HermeScan (30+98
-  firmware, 163 vulns in the 0-day set), MANGODFA (49+7+1,698 firmware,
-  83,644 raw alerts → 70 PoC-verified vulns), PANGOLIN (12 devices/8
-  vendors, 68 new vulns/31 CVEs). All 4 papers' actual headline
-  contribution is large-scale *zero-day* discovery, not known-CVE
-  validation — known-CVE checking is closer to their internal sanity
-  check. That scale (teams of 5-9 researchers, months, real vendor
-  disclosure) is unrealistic for a one-month solo extension, so decided
-  explicitly NOT to aim for it now — noted as a distinct, deliberately
-  out-of-scope future decision point in `PLAN.md` rather than something to
-  casually fold into "the next phase."
-- Instead scoped this phase down to one concrete proof-of-concept: does
-  the pipeline survive contact with a real, unmodified vendor binary at
-  all. Picked **CVE-2016-6277** (unauthenticated command injection,
-  `/cgi-bin/;<command>`, Netgear R6400/R7000) as the target — chose this
-  over the `iserver_passcode`/`dlnad` example MANGODFA's own paper shows
-  (Listing 1), since that one appears to be a research finding by the
-  paper's authors without a confirmed formal CVE ID, whereas CVE-2016-6277
-  is a real, citable, formally assigned CVE with known vulnerable
-  (R6400 v1.0.1.12) and fixed (v1.0.1.20) firmware versions per Netgear's
-  own advisory — meaning a real vulnerable/patched *firmware* pair may be
-  obtainable, extending the exact comparison methodology already used for
-  BusyBox to unmodified vendor binaries. Firmware source: the Karonte
-  dataset (49 real firmware images from Netgear/D-Link/TP-Link/Tenda —
-  the same dataset MANGODFA evaluates against), confirmed via its GitHub
-  README to be freely downloadable (Google Drive link), not gated behind
-  a request form.
-- Decided on a **no-redistribution policy** before planning the folder
-  layout: unlike BusyBox (GPL, self-compiled), vendor firmware is
-  proprietary — won't commit firmware images or the full `binwalk`
-  extraction to the repo, only document exact download URLs/checksums for
-  reproducibility and commit the small decompiled pseudo-C snippet
-  actually analyzed (the same scope PANGOLIN/MANGODFA themselves publish
-  in their papers).
-- Designed the repo layout: a new top-level `firmware/` folder, sibling
-  to (not nested inside) `samples/`/`ir/`/`binaries/`/`pseudo-code/`,
-  since the firmware pipeline has a structurally different shape (no
-  source, no IR stage, cross-binary rather than single-function) and
-  folding it into the existing folders would misrepresent what's there.
-  Also need a new `prompts/command-injection.md` template and a matching
-  entry in `scripts/bug_classes.py`, since none of the 5 existing
-  memory-safety templates apply to this bug class.
-- Wrote all of the above into `PLAN.md` as a new "Stage 7" section, plus
-  an explicit "out of scope for now" subsection with the 4-paper scale
-  comparison table, and added an "immediate next actions" item.
-- Next: confirm both exact Netgear R6400 firmware versions
-  (1.0.1.12 vulnerable, 1.0.1.20 fixed) are actually obtainable (Karonte
-  dataset or Netgear's own archive) before doing any extraction work.
-
-## 2026-07-14 — Got both firmware versions directly from Netgear; caught a methodology gap before implementing
-
-- Checked whether the Karonte dataset (planned source) actually contains
-  the right R6400 firmware before committing to the ~1-hour download: its
-  `config/NETGEAR/r_6400.json` references `R6400v2`, firmware
-  `V1.0.2.46_1.0.36` — a different model variant/version than needed, and
-  already newer than even our target fixed version (1.0.2.46 > 1.0.1.20),
-  so it's almost certainly already patched and wouldn't contain
-  CVE-2016-6277 at all. Skipped the Karonte download entirely.
-- Found both exact firmware versions directly on Netgear's own KB
-  articles, with direct download URLs
-  (`downloads.netgear.com/files/GDC/R6400/R6400-V1.0.1.12_1.0.11.zip` and
-  `...V1.0.1.20_1.0.16.zip`). Downloaded both directly (curl, ~26-27MB
-  each, seconds not an hour), recorded sha256 checksums, unzipped —
-  confirmed real `.chk` firmware images with plausible dates (vulnerable:
-  May 2016, patched: Jan 2017), consistent with the CVE's disclosure
-  timeline.
-- Checked the patched version's release notes for direct confirmation:
-  mentions "Improves security protection on the device's web server" but
-  doesn't name CVE-2016-6277 or the `cgi-bin` endpoint explicitly (typical
-  for consumer release notes). Flagged this as suggestive, not
-  confirmation — the real proof has to come from actually diffing the
-  decompiled `cgi-bin`-handling binary between the two versions, same
-  rigor as every BusyBox sample, not from marketing text.
-- **Caught a real methodology gap before doing any binwalk/Ghidra work**:
-  the first draft of the Stage 7 plan had us manually locate the one
-  known-vulnerable function (Ghidra string search, same technique as the
-  BusyBox samples) and hand *that single function* to the LLM. This would
-  have made the phase almost a re-run of the calibration benchmark on an
-  uglier binary — it wouldn't test real discovery (the LLM would be told
-  exactly where to look, same as every BusyBox sample) and couldn't test
-  a cross-binary vulnerability at all (an isolated function has no "other
-  binary" to reason about). Corrected the plan: manual Ghidra work stays,
-  but only to establish ground truth to score against; what the LLM
-  actually gets shown is *every* function in the relevant binary (or
-  every function reachable from the web-request entry point), run through
-  the same command-injection prompt each time — a genuine discovery task,
-  scored on whether the real vulnerable function gets flagged and
-  everything else stays quiet. This is the "run the per-function prompt
-  over every function, not just the known one" idea that was explicitly
-  shelved as an optional stretch goal for the BusyBox benchmark — for this
-  phase it's not optional, it's the actual point of moving to real
-  firmware.
-- Updated `PLAN.md`'s Stage 7 to reflect both the corrected firmware
-  source (direct Netgear download, not Karonte) and the ground-truth vs.
-  LLM-task split, including that `run_benchmark.py`/`score.py` will need
-  a real extension later (currently assume one file per sample/variant,
-  not one file per function within a sample).
-- Next: `binwalk -e` both `.chk` files, locate the binary(ies) handling
-  `/cgi-bin/` requests. User is doing this step manually/hands-on going
-  forward rather than delegating each command.
-
-## 2026-07-14 — Firmware extraction started; a second, deeper scoping correction
-
-- Moved both downloaded firmware `.zip`/`.chk` files (and their
-  extractions) out of the git repo entirely, into
-  `/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/firmware/netgear-r6400/`
-  — a sibling of, not inside, `OneMonthExtension` — so the no-redistribution
-  policy can't be violated by accident (nothing proprietary is even
-  reachable from `git add -A` in the tracked repo).
-- User ran `binwalk -e` on the vulnerable `.chk` herself (working hands-on
-  from here on, not delegating each command). Despite `sasquatch`
-  extractor warnings, extraction succeeded via binwalk's fallback,
-  producing a real `squashfs-root/` filesystem (confirmed via the TRX
-  header + SquashFS signature binwalk detected, and real symlink warnings
-  referencing actual extracted files).
-- Searched the extracted filesystem for cgi-bin/web-server binaries;
-  found several candidates (`www/cgi-bin/genie.cgi`,
-  `usr/sbin/httpd`, plus some remote-management/ReadyCLOUD `.cgi`
-  binaries under `opt/`). Reasoned that `usr/sbin/httpd` is the more
-  likely target over `genie.cgi`, since the CVE's exploit path
-  (`/cgi-bin/;<command>`) is a bare semicolon with no real script name —
-  suggesting the bug is in how `httpd` itself parses the URL path, before
-  ever dispatching to a named `.cgi` file. Confirmed both are genuinely
-  separate ELF binaries (not symlinks to each other): ARM 32-bit, EABI5,
-  dynamically linked against uClibc, stripped.
-- **Second scoping correction, deeper than the previous one**: while
-  explaining why we're locating `httpd` manually (ground truth only, not
-  what the LLM sees — per the earlier correction), the user pushed further:
-  isn't scoping the LLM's task to "every function in `httpd`" *itself*
-  still a hint, the same way "the one known function" was? Yes — this is
-  the same principle applied one level up. Researched where this is
-  actually addressed in the literature: MANGODFA names it "border binary"
-  selection. Karonte/SaTC pre-filter a firmware image (127 binaries on
-  average, MANGODFA's own reported figure) down to a small heuristically-
-  guessed subset before analyzing anything (SaTC caps this at 3 border
-  binaries per image) — and this filtering causes real missed
-  vulnerabilities: MANGODFA's own paper cites the exact cross-binary bug
-  discussed earlier (`dlnad`) as a case SaTC/Karonte missed specifically
-  because their border-binary heuristic excluded it for being small and
-  not "web-facing enough." MANGODFA's actual fix isn't a smarter
-  heuristic — it's making their core dataflow analysis fast enough to
-  analyze every binary in a firmware image with no filtering at all
-  (6,920 binaries across 49 images). Checked FirmAgent/HermeScan/PANGOLIN
-  for the same discussion — found none; they don't appear to treat binary
-  selection as a first-class problem the way MANGODFA does.
-- Decision: keep this phase's scope at "every function in one
-  human-pre-selected binary" (explicitly named as the middle rung of a
-  3-rung ladder: single function → whole binary → whole firmware with no
-  hints), since MANGODFA's own solution to full-firmware scanning required
-  a novel, fast algorithm that doesn't translate to this project's setup
-  (bottlenecked by billed LLM calls per function, not local compute).
-  Documented this whole discussion — the exact MANGODFA quote, the 3-rung
-  ladder, and why whole-firmware-no-hints scanning is a separate,
-  explicitly out-of-scope stretch goal (arguably harder than the
-  large-scale-evaluation one already noted) — directly in `PLAN.md`'s
-  Stage 7, so the reasoning survives even though the final scope decision
-  didn't change from the previous entry.
-- Next: continue locating the real vulnerable function inside `httpd` —
-  user was about to search for cross-references to the `system` import
-  (visible by name even in a stripped dynamically-linked binary, since
-  imports must keep their names for the dynamic linker to resolve them).
-
-## 2026-07-14 — Found and documented the ground-truth vulnerable function
-
-- Located `system`'s callers via Ghidra's Function Call Trees "Incoming
-  Calls" (the naive "Show References to Address" on the import stub only
-  showed 1 location — the import table's self-reference — not the real
-  call sites; Incoming Calls walks the actual disassembled call graph
-  instead and found the full list).
-- Rather than checking every `system()` caller one by one, worked
-  backward from the request-routing side instead: searched for the
-  literal strings `"cgi-bin"`/`"cgi-bin/"` (generic, not tied to any named
-  script — matching the exploit's script-name-less `/cgi-bin/;<command>`
-  pattern) and traced forward through the real call chain:
-  - **`parse_http_request`** — top-level HTTP router; explicitly checks
-    for the `cgi-bin` prefix as part of deciding which requests skip
-    authentication/session checks (this is *why* the exploit needs no
-    login).
-  - **`handle_get`** (`FUN_00019628`) — for any URL containing
-    `cgi-bin`, skips normal static-file serving and dispatches straight
-    to `FUN_00033e0c`.
-  - **`netgear_commonCgi`** (`FUN_00033e0c`) — the actual vulnerable
-    function. Confirmed unambiguously: for a URL with no `?` query
-    string (matching the real exploit), it takes everything after
-    `cgi-bin/` in the URL and copies it via `strcpy` into a 64-byte
-    stack buffer with **no length check and no character filtering**,
-    then splices that buffer into a shell command string via `sprintf`
-    (`"/www/cgi-bin/%s > /tmp/cgi_result"`) and executes it with
-    `system()`. For the exploit URL `/cgi-bin/;<command>`, the raw
-    substring after `cgi-bin/` is literally `;<command>` — `system()`
-    invokes the result via `/bin/sh -c`, where `;` is a command
-    separator, so the attacker's command runs as a fully separate shell
-    command, as root.
-- This confirms the mechanism matches the CVE description exactly (the
-  bare-semicolon, no-script-name exploit shape) and gives a precise,
-  traceable root cause — not just a plausible guess.
-- **Documented as ground truth**, per the earlier methodology correction
-  (this is for scoring an LLM's answer later, not what gets shown to it
-  directly): created `firmware/CVE-2016-6277-netgear-r6400/info.md` with
-  the full traced mechanism, download URLs + checksums for both firmware
-  versions, and an explicit note repeating why this is ground-truth-only.
-  Saved the two directly-relevant decompiled functions
-  (`netgear_commonCgi.c`, `handle_get.c`) to `pseudo-code/vulnerable/`;
-  didn't save `parse_http_request` verbatim (its role — auth-bypass for
-  `cgi-bin` — is already captured in `info.md`, and the function itself is
-  enormous and mostly unrelated language-detection logic, low marginal
-  value to store in full). Added `index.csv` in the same shape as
-  `samples/index.csv`, scoped to this phase.
-- Also found and reconciled a leftover from the very start of the
-  project: a placeholder `firmware/` folder already existed in the repo
-  (created before the CVE-benchmark pivot, with an outdated README
-  describing RetDec-based IR lifting — an approach since dropped for
-  Ghidra pseudo-code). Rewrote `firmware/README.md` to match the actual
-  Stage 7 pipeline and no-redistribution policy, and extended
-  `.gitignore` so the existing `firmware/raw/` and `firmware/extracted/`
-  folders (kept via `.gitkeep`) can hold real firmware locally without
-  ever being committed.
-- Next: locate the same function in the **patched** (v1.0.1.20) binary
-  the same way, to confirm what actually changed (expect either
-  sanitization/escaping added to the `strcpy`, a length bound, or
-  `system()` replaced with a non-shell exec). Then build the actual LLM
-  discovery task (every function in `httpd`, not just these three) per
-  the ground-truth-vs-LLM-task split already documented in `PLAN.md`.
-
-## 2026-07-14 — Wrote (but paused) the bulk-export tooling; found and confirmed the patched fix
-
-- Before locating the patched function, started building the tooling for
-  the actual next step per `PLAN.md` (every function in `httpd`, not just
-  the 3 traced for ground truth): found the existing GUI project on disk
-  (`~/Ghidra-projects/iot-static-benchmark/IoT-Sec-Static.gpr`, program
-  path `/netgear/httpd`) and Ghidra's install
-  (`~/Ghidra/ghidra_12.1.2_PUBLIC`), then wrote
-  `scripts/ghidra/export_all_functions.py` — a headless post-script that
-  iterates every function via `DecompInterface`, skips thunks/externals
-  and anything under a minimum size (agreed via a quick check-in: filter
-  by size rather than export all 1393 functions unfiltered or apply a
-  more elaborate scheme), and writes each surviving function to its own
-  `FUN_<address>.c` file. Paused before running it — user wanted to find
-  the patched ground truth first, so this is written and ready but not
-  yet executed.
-- Located `netgear_commonCgi` in the **patched** (v1.0.1.20) binary
-  directly via string search on `ntgr_cgi_debug_msg` (a debug-logging
-  string used throughout the function, unique enough to skip re-tracing
-  the whole `parse_http_request` → `handle_get` chain). Confirmed same
-  function, same overall structure, same `strcpy`/`sprintf`/`system()`
-  pattern still present — **the root cause itself was not removed**.
-- The actual fix is two new defensive checks added in front of the
-  unchanged vulnerable code:
-  1. A blocklist check at function entry, on the raw URL, rejecting the
-     whole request if it contains `;`, `` ` ``, `$`, or `..` — `;` being
-     exactly the character the real exploit needs, so this directly
-     closes the documented attack.
-  2. A new allowlist check (added after the vulnerable `strcpy` but
-     before the `sprintf`/`system()` call) comparing the parsed CGI name
-     against a fixed array of allowed strings, exiting if there's no
-     exact match.
-  Flagged a genuine security observation worth keeping: this is a
-  blocklist/allowlist patch, not a root-cause fix — the blocklist only
-  covers 4 specific patterns (not `|`, `&`, `>`, `<`, newline, etc.), and
-  the unsafe `sprintf`-into-`system()` pattern itself is still there.
-- Saved `pseudo-code/patched/netgear_commonCgi.c` and updated `info.md`
-  with the full fix analysis (both code snippets, the security note).
-  `CVE-2016-6277-netgear-r6400`'s ground truth is now complete on both
-  sides.
-- Next: run the paused `export_all_functions.py` headless script against
-  both the vulnerable and patched `httpd` binaries to get the full
-  function set for the actual LLM discovery task, per the
-  ground-truth-vs-LLM-task split.
-
-## 2026-07-15 — Bulk-exported all functions from both binaries; built the firmware benchmark scripts
-
-- Ran the paused export script — hit a chain of real environment issues
-  before it worked:
-  1. `-process httpd` alone didn't find the program (nested in a
-     `/netgear` folder, not project root) — fixed with `-recursive`.
-  2. Ghidra 12.1.2 has **dropped classic Jython `.py` script support**
-     in favor of PyGhidra (needs a separate Python runtime not set up
-     here) — rewrote the script in Java
-     (`scripts/ghidra/ExportAllFunctions.java`), which compiles/runs
-     headless with zero extra setup regardless of Ghidra version.
-     Deleted the now-unusable `.py` version.
-  3. Discovered the patched `httpd` was already imported too (at
-     `/netgear/patched/httpd`) — saves a step.
-  4. Both binaries are literally named `httpd`, and local Ghidra
-     projects can't scope `-process` to one folder (only by filename,
-     confirmed via `analyzeHeadlessREADME.md` — the `<project>:<folder>`
-     syntax is for remote Ghidra Server repositories only, not local
-     projects). Fixed by having the script self-organize output into a
-     subfolder named after each program's actual project path
-     (`netgear_httpd/`, `netgear_patched_httpd/`), so one recursive run
-     safely handles both without collision.
-  5. First real run (`-noanalysis`, reusing existing GUI analysis)
-     "succeeded" — 964/1393 vulnerable, 967/1397 patched exported — but
-     diffing the bulk output against the hand-saved
-     `netgear_commonCgi.c` showed a real quality regression: string
-     literals rendered as opaque `DAT_xxxxx` addresses instead of actual
-     text (e.g. `acosNvramConfig_match(DAT_00034660,DAT_00034664)`
-     instead of `("ntgr_cgi_debug_msg","1")`) — logic identical, just far
-     less readable/informative than what the GUI showed. Asked before
-     accepting this degraded output; user asked for a proper fix rather
-     than accepting it.
-  6. Tried dropping `-noanalysis` (full re-analysis from scratch,
-     ~10+ min) suspecting the analysis itself was incomplete — **did not
-     fix it**, same `DAT_xxxxx` placeholders persisted even with fresh
-     full analysis (confirmed `ASCII Strings` analyzer did run, 7+4
-     seconds logged). Wrong diagnosis.
-  7. Real cause: the script never explicitly configured the
-     `DecompInterface`'s simplification style. The GUI's Decompile panel
-     always uses the full "decompile" style (which includes string
-     substitution); a bare scripted `DecompInterface` can default to a
-     less aggressive style that leaves pointer references unresolved.
-     Fixed by adding explicit `DecompileOptions` (`grabFromProgram`) and
-     `decomp.setSimplificationStyle("decompile")` before decompiling.
-     Re-ran with `-noanalysis` again (fast, since real analysis was
-     already saved from step 6) — confirmed fixed: 23 resolved string
-     references, 0 `DAT_` placeholders, and as a bonus the two functions
-     that previously timed out during decompilation (including the giant
-     `parse_http_request`) now decompile successfully too (0 failures on
-     either binary). Diffed against the hand-saved ground truth again —
-     only whitespace differences now, content identical.
-- **Final counts: 1004 vulnerable + 1007 patched functions exported**,
-  confirmed all 4 known ground-truth functions present
-  (`FUN_00033e0c`/`FUN_00019628` vulnerable, `FUN_00034694` patched,
-  `FUN_0000f97c` = `parse_http_request` now included too). Output lives
-  at `/repo/firmware/netgear-r6400/decompiled/` — outside the git repo
-  entirely (same sibling location as the raw firmware), not committed:
-  ~2000 auto-generated files, fully regeneratable from the firmware +
-  `ExportAllFunctions.java`, not worth the repo bloat.
-- User asked whether the existing `run_benchmark.py`/`score.py` could
-  handle this, or if new scripts were needed — confirmed new scripts are
-  needed (different iteration shape: many function-files per binary, not
-  one file per sample/variant) and flagged the real cost implication
-  before building anything: running the full 5-prompt cross-product (like
-  the BusyBox benchmark) against ~1931 functions would be ~19,000+ API
-  calls, wildly out of scope for a proof-of-concept. Confirmed with the
-  user: run **only** the command-injection prompt here (~3,862 calls for
-  2 models), matching what this phase is actually testing.
-- Built the remaining Stage 7 checklist items:
-  - `prompts/command-injection.md` — new template, explicitly instructs
-    not to treat a partial metacharacter blocklist as proof of safety
-    (directly informed by the patched-binary fix analysis).
-  - `scripts/bug_classes.py` — added the `command-injection` entry.
-  - `firmware/CVE-2016-6277-netgear-r6400/ground_truth.csv` — new,
-    small ground-truth file: which function filename is expected
-    "vulnerable" per variant (`FUN_00033e0c.c` for vulnerable, none for
-    patched — needed because the compiler laid out the patched binary
-    differently, so the same logical function has a *different* address,
-    `FUN_00034694`, in that binary; patched is expected "no" across every
-    function, including that one, matching the CVE-2016-6277
-    fix-neutralizes-not-removes finding).
-  - `scripts/run_benchmark_firmware.py` — reuses `call_model`/
-    `build_prompt` from `run_benchmark.py`, iterates every `.c` file in
-    two given directories (vulnerable/patched), runs only the
-    command-injection prompt, writes to `results/runs-firmware/`. Added
-    a resumability feature not present in the original script (skip a
-    function/model pair if its output file already exists) — worth
-    having at this scale in case a ~3,862-call run gets interrupted.
-  - `scripts/score_firmware.py` — reads `ground_truth.csv`, categorizes
-    each result the same way as `score.py`
-    (true/false positive/negative), writes
-    `firmware/<cve_id>/scoring.csv`, prints a summary plus which
-    model(s) found or missed the real bug and every false positive
-    (capped at 50 printed, full list always in the CSV).
-  - Verified `score_firmware.py`'s categorization logic with a small
-    hand-built dry run (5 fake result files covering all 4 categories)
-    before trusting it, same practice as `score.py` earlier — all
-    correct.
-- Still blocked on API keys to actually run this.
+- Mentor (via Elaine, handling reimbursement) approved self-funded setup
+  but asked to check for a fixed-monthly plan first, and to cap
+  pay-as-you-go spending at $200 with approval + a cost quotation before
+  purchasing.
+- Confirmed via both providers' own documentation that no fixed-monthly
+  plan includes programmatic API access (Claude Pro/Max and ChatGPT
+  Plus/Pro are billed entirely separately from the API) — pay-as-you-go
+  is the only real option.
+- Measured (not guessed) real cost from actual file sizes: BusyBox
+  benchmark ~$1.90 (both models), firmware benchmark ~$50.73 measured /
+  ~$65-70 quoted with a safety margin (both models). Well under the $200
+  cap even combined.
+- Proposed a staged spending plan to avoid the firmware benchmark being a
+  blind single large spend: cheap dry run on a handful of functions
+  first → one full model → decide on the second model based on results,
+  rather than running both models blind on the first attempt.
+- Restructured top-level docs for reviewer-readiness (mentor/Elaine asked
+  to see the repo before the full run): added `PIPELINE.md` (the primary
+  "why" narrative, stage by stage) and trimmed `PLAN.md` (now a lean
+  current-state/how-to reference) and this file (removed narrative
+  padding now covered by `PIPELINE.md`, kept the factual timeline).
+- **Status**: both benchmarks fully built, blocked only on the spending
+  approval + reply confirming the exact OpenAI model ID.
