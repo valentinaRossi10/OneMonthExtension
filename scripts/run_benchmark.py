@@ -74,7 +74,7 @@ def call_anthropic(model: str, prompt: str) -> str:
     client = anthropic.Anthropic()
     resp = client.messages.create(
         model=model,
-        max_tokens=1024,
+        max_tokens=4096,
         messages=[{"role": "user", "content": prompt}],
     )
     return "".join(block.text for block in resp.content if block.type == "text")
