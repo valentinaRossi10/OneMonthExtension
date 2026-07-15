@@ -99,6 +99,36 @@ decompiled file sizes) — staged spending plan (cheap dry run → one
 model → second model) proposed to the mentor rather than a single blind
 run.
 
+## Future possibilities
+
+**Containerize the environment (Docker).** Not needed for the current
+one-machine workflow, but worth doing if this pipeline needs to be
+reproduced elsewhere (another machine, the mentor's own setup, or a
+future continuation of this project) — several real problems this
+project hit were specifically *environment* problems, not logic bugs:
+- The BusyBox build needed a minimal Kconfig specifically to dodge
+  legacy-applet failures against this host's modern kernel headers/glibc
+  (`networking/tc.c`, `rdate`'s `stime()`) — a pinned older base image
+  would avoid needing that workaround at all.
+- The scratchpad holding intermediate build state got wiped between
+  sessions multiple times, forcing repeated re-cloning/re-building — a
+  container with a mounted volume would make that state durable and
+  explicit instead of implicit and fragile.
+- Several scripts and this doc currently reference this machine's
+  absolute paths (`/home/valentinarossi/...` for the Ghidra install and
+  project) — a container would make setup reproducible on any machine
+  without hand-editing paths.
+- The headless Ghidra pipeline (`analyzeHeadless` + `ExportAllFunctions.java`)
+  is a natural fit for a container — no GUI needed, and the exact Ghidra
+  version matters (the Jython→PyGhidra change between versions was a real
+  issue hit this project; pinning a specific Ghidra version in an image
+  avoids that class of surprise entirely).
+
+Not pursuing now since it would take real time away from the actual
+research question for a one-machine, one-person project on a one-month
+timeline — but a reasonable next step if this needs to be shared,
+reproduced, or handed off.
+
 ## Immediate next actions
 
 1. Waiting on mentor/Elaine's approval of the API spending plan
