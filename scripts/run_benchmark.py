@@ -33,6 +33,14 @@ PROMPTS_DIR = REPO_ROOT / "prompts"
 RESULTS_DIR = REPO_ROOT / "results" / "runs"
 MODELS_CONFIG = Path(__file__).resolve().parent / "models.yaml"
 
+# Real pseudo-code files for these samples top out around 12KB. The one
+# LLVM IR fallback in use (CVE-2021-42386's patched variant, which has no
+# pseudo-C because the fix removes the function entirely) turned out to be
+# over 1MB - sent as-is, once per prompt template per model, it dominated
+# an entire benchmark run's token spend. This guard catches any input of
+# that scale before it reaches the API, instead of silently paying for it.
+MAX_CODE_CHARS = 50_000
+
 
 def load_models():
     with open(MODELS_CONFIG) as f:
@@ -120,6 +128,14 @@ def main():
                 continue
 
             code = code_path.read_text()
+            if len(code) > MAX_CODE_CHARS:
+                print(
+                    f"SKIP {cve_id} ({variant}, {representation}): {code_path} is "
+                    f"{len(code):,} chars, over the {MAX_CODE_CHARS:,}-char guard "
+                    f"(see MAX_CODE_CHARS comment) - would blow up token spend",
+                    file=sys.stderr,
+                )
+                continue
 
             for prompt_file in ALL_PROMPT_FILES:
                 prompt_slug = Path(prompt_file).stem

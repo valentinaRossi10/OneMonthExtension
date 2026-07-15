@@ -319,3 +319,57 @@ stage/status, see `PLAN.md`. Does not reference git commit hashes.
   guidance from the mentor). Worth flagging to the mentor before the full
   spend, since it changes the actual model comparison from "Claude vs
   GPT" to effectively "GPT only" unless addressed.
+
+## 2026-07-15 — Runaway token spend: unguarded LLVM IR fallback for CVE-2021-42386
+
+- Ran the full 5-sample cross-product for real (branch `W1/execution`,
+  both models) to check for any additional bugs before the real staged
+  spend. All 120 expected output files were produced (exit code 0), but
+  actual spend was far higher than the ~$1.90 estimate: OpenAI's own
+  Usage dashboard showed **$27.61 spent, 32 requests, ~3.106M input
+  tokens** for this project's work today, and the account's credit
+  balance had gone negative (-$16.61), which is what caused 33/60
+  `gpt-5.6-sol` calls to fail with `429 insufficient_quota` partway
+  through the run (the other 60 `claude-fable-5` calls came back as the
+  already-documented empty refusals, unrelated to this).
+- First hypothesis (hidden reasoning tokens on the flagship `sol` tier)
+  was wrong: total tokens (~3.1M) ≈ input tokens (~3.106M), so output/
+  reasoning was negligible. The spend was almost entirely **input**
+  tokens.
+- Root cause, confirmed by measuring actual file sizes: every real
+  pseudo-code file in `pseudo-code/` is small (1KB-12KB). But
+  `CVE-2021-42386`'s `patched` variant has no pseudo-C (the fix removes
+  the function entirely - the one documented case that falls back to
+  `ir/CVE-2021-42386-busybox/patched.ll`), and that IR fallback file
+  turned out to be **1,081,065 characters** - roughly 100x any real
+  pseudo-code file, and LLVM IR tokenizes worse than English/C due to
+  its punctuation-heavy syntax (`%`, `i32`, `getelementptr`, ...), so the
+  true token count is likely on the high end of a 270K-540K estimate.
+  Sent whole, unfiltered, once per prompt template (6x) per model = 12
+  calls at that size. Verified the 6 successful `gpt-5.6-sol` calls using
+  this file actually went through at full size (small, real answers in
+  the output files) - these 6-12 calls plausibly account for nearly all
+  of the 3.1M tokens billed, dwarfing the other ~114 calls combined.
+- The original "~$1.90, measured from actual file sizes" estimate didn't
+  catch this outlier - it measured typical files, not this one edge
+  case.
+- **Fix**: added `MAX_CODE_CHARS = 50_000` guard in `run_benchmark.py`
+  (comfortably above the largest real pseudo-code file, well below the
+  1MB+ IR outlier). Any code input over that size is now skipped with a
+  `SKIP` message to stderr instead of silently being sent to the API.
+  Verified against all 10 real (sample, variant) inputs: only
+  `CVE-2021-42386`'s `patched`/IR combination trips the guard: every
+  other input passes through unaffected.
+- **Implication for `CVE-2021-42386`**: with the guard in place, this
+  sample's `patched` variant now produces no result files at all (rather
+  than 12 extremely expensive ones) - `score.py` already handles missing
+  files gracefully (just fewer rows), so this doesn't break scoring, but
+  it does mean this one sample effectively drops out of the "patched
+  code stays quiet" true-negative measurement. Worth deciding later
+  (Stage 6) whether that's acceptable or whether this sample needs a
+  smaller, targeted IR extract instead of skipping outright.
+- **Status**: guard committed. Re-running the benchmark for real (clean
+  budget, both providers billing-healthy) is still pending -
+  `claude-fable-5`'s refusal issue is unresolved, so a clean run will
+  still show 60/60 refusals on that side until that's separately
+  addressed.
