@@ -13,6 +13,7 @@ BUG_CLASS_TO_PROMPT = {
     "integer-overflow": "memory-integer-overflow.md",
     "null-pointer-dereference": "memory-null-pointer-dereference.md",
     "out-of-bounds-read": "memory-out-of-bounds-read.md",
+    "command-injection": "command-injection.md",
 }
 
 # Every distinct prompt template file, in a stable order — this is the set

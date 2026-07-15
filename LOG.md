@@ -941,3 +941,103 @@ One entry per session/action — used to track progress against `PLAN.md`.
   both the vulnerable and patched `httpd` binaries to get the full
   function set for the actual LLM discovery task, per the
   ground-truth-vs-LLM-task split.
+
+## 2026-07-15 — Bulk-exported all functions from both binaries; built the firmware benchmark scripts
+
+- Ran the paused export script — hit a chain of real environment issues
+  before it worked:
+  1. `-process httpd` alone didn't find the program (nested in a
+     `/netgear` folder, not project root) — fixed with `-recursive`.
+  2. Ghidra 12.1.2 has **dropped classic Jython `.py` script support**
+     in favor of PyGhidra (needs a separate Python runtime not set up
+     here) — rewrote the script in Java
+     (`scripts/ghidra/ExportAllFunctions.java`), which compiles/runs
+     headless with zero extra setup regardless of Ghidra version.
+     Deleted the now-unusable `.py` version.
+  3. Discovered the patched `httpd` was already imported too (at
+     `/netgear/patched/httpd`) — saves a step.
+  4. Both binaries are literally named `httpd`, and local Ghidra
+     projects can't scope `-process` to one folder (only by filename,
+     confirmed via `analyzeHeadlessREADME.md` — the `<project>:<folder>`
+     syntax is for remote Ghidra Server repositories only, not local
+     projects). Fixed by having the script self-organize output into a
+     subfolder named after each program's actual project path
+     (`netgear_httpd/`, `netgear_patched_httpd/`), so one recursive run
+     safely handles both without collision.
+  5. First real run (`-noanalysis`, reusing existing GUI analysis)
+     "succeeded" — 964/1393 vulnerable, 967/1397 patched exported — but
+     diffing the bulk output against the hand-saved
+     `netgear_commonCgi.c` showed a real quality regression: string
+     literals rendered as opaque `DAT_xxxxx` addresses instead of actual
+     text (e.g. `acosNvramConfig_match(DAT_00034660,DAT_00034664)`
+     instead of `("ntgr_cgi_debug_msg","1")`) — logic identical, just far
+     less readable/informative than what the GUI showed. Asked before
+     accepting this degraded output; user asked for a proper fix rather
+     than accepting it.
+  6. Tried dropping `-noanalysis` (full re-analysis from scratch,
+     ~10+ min) suspecting the analysis itself was incomplete — **did not
+     fix it**, same `DAT_xxxxx` placeholders persisted even with fresh
+     full analysis (confirmed `ASCII Strings` analyzer did run, 7+4
+     seconds logged). Wrong diagnosis.
+  7. Real cause: the script never explicitly configured the
+     `DecompInterface`'s simplification style. The GUI's Decompile panel
+     always uses the full "decompile" style (which includes string
+     substitution); a bare scripted `DecompInterface` can default to a
+     less aggressive style that leaves pointer references unresolved.
+     Fixed by adding explicit `DecompileOptions` (`grabFromProgram`) and
+     `decomp.setSimplificationStyle("decompile")` before decompiling.
+     Re-ran with `-noanalysis` again (fast, since real analysis was
+     already saved from step 6) — confirmed fixed: 23 resolved string
+     references, 0 `DAT_` placeholders, and as a bonus the two functions
+     that previously timed out during decompilation (including the giant
+     `parse_http_request`) now decompile successfully too (0 failures on
+     either binary). Diffed against the hand-saved ground truth again —
+     only whitespace differences now, content identical.
+- **Final counts: 1004 vulnerable + 1007 patched functions exported**,
+  confirmed all 4 known ground-truth functions present
+  (`FUN_00033e0c`/`FUN_00019628` vulnerable, `FUN_00034694` patched,
+  `FUN_0000f97c` = `parse_http_request` now included too). Output lives
+  at `/repo/firmware/netgear-r6400/decompiled/` — outside the git repo
+  entirely (same sibling location as the raw firmware), not committed:
+  ~2000 auto-generated files, fully regeneratable from the firmware +
+  `ExportAllFunctions.java`, not worth the repo bloat.
+- User asked whether the existing `run_benchmark.py`/`score.py` could
+  handle this, or if new scripts were needed — confirmed new scripts are
+  needed (different iteration shape: many function-files per binary, not
+  one file per sample/variant) and flagged the real cost implication
+  before building anything: running the full 5-prompt cross-product (like
+  the BusyBox benchmark) against ~1931 functions would be ~19,000+ API
+  calls, wildly out of scope for a proof-of-concept. Confirmed with the
+  user: run **only** the command-injection prompt here (~3,862 calls for
+  2 models), matching what this phase is actually testing.
+- Built the remaining Stage 7 checklist items:
+  - `prompts/command-injection.md` — new template, explicitly instructs
+    not to treat a partial metacharacter blocklist as proof of safety
+    (directly informed by the patched-binary fix analysis).
+  - `scripts/bug_classes.py` — added the `command-injection` entry.
+  - `firmware/CVE-2016-6277-netgear-r6400/ground_truth.csv` — new,
+    small ground-truth file: which function filename is expected
+    "vulnerable" per variant (`FUN_00033e0c.c` for vulnerable, none for
+    patched — needed because the compiler laid out the patched binary
+    differently, so the same logical function has a *different* address,
+    `FUN_00034694`, in that binary; patched is expected "no" across every
+    function, including that one, matching the CVE-2016-6277
+    fix-neutralizes-not-removes finding).
+  - `scripts/run_benchmark_firmware.py` — reuses `call_model`/
+    `build_prompt` from `run_benchmark.py`, iterates every `.c` file in
+    two given directories (vulnerable/patched), runs only the
+    command-injection prompt, writes to `results/runs-firmware/`. Added
+    a resumability feature not present in the original script (skip a
+    function/model pair if its output file already exists) — worth
+    having at this scale in case a ~3,862-call run gets interrupted.
+  - `scripts/score_firmware.py` — reads `ground_truth.csv`, categorizes
+    each result the same way as `score.py`
+    (true/false positive/negative), writes
+    `firmware/<cve_id>/scoring.csv`, prints a summary plus which
+    model(s) found or missed the real bug and every false positive
+    (capped at 50 printed, full list always in the CSV).
+  - Verified `score_firmware.py`'s categorization logic with a small
+    hand-built dry run (5 fake result files covering all 4 categories)
+    before trusting it, same practice as `score.py` earlier — all
+    correct.
+- Still blocked on API keys to actually run this.
