@@ -146,6 +146,12 @@ def main():
             reason = "patched code flagged" if r["variant"] == "patched" else "mismatched bug class flagged"
             print(f"  {r['cve_id']} / {r['variant']} / {r['model']} / prompt={r['prompt']} ({reason})")
 
+    fns = [r for r in rows if r["category"] == "false_negative"]
+    if fns:
+        print(f"\nFalse negatives ({len(fns)}):")
+        for r in fns:
+            print(f"  {r['cve_id']} / {r['model']} (missed the real {r['bug_class']} bug)")
+
 
 if __name__ == "__main__":
     main()
