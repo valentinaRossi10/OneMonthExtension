@@ -437,3 +437,64 @@ analysis) in `PLAN.md`/`PIPELINE.md`, replacing the discarded
 
 **Status**: not started. Next concrete step is defining the two skill
 summaries (function-level, codebase-level) to hand to Codex.
+
+## 2026-07-17 — Tier A skill built via Codex: `classify-function-vulnerabilities`
+
+- Wrote a Tier A skill brief first (purpose, inputs, output format,
+  known pitfalls from this log, validation step) before touching Codex,
+  so it had a concrete spec rather than needing to infer intent live.
+- Iterated on the actual Codex prompt through several rounds before
+  using it: first draft referenced the old (now-removed) scripts as
+  reference material - dropped that, since the point was testing
+  whether Codex could design this on its own. Second round added far
+  more explanation of what Tier A actually is (single function,
+  isolated, no cross-function context - a narrow classification task,
+  not discovery) and what the real inputs look like, since the first
+  draft was too terse and leaned on doc pointers alone. Also moved
+  prompt-template design fully onto Codex rather than pointing it at an
+  existing `prompts/` library, to test that capability specifically.
+- Asked Codex to **summarize the skill design first** and wait for
+  approval before writing any code - this surfaced a genuine
+  methodological finding before any implementation existed:
+  `CVE-2021-42386`'s UAF sample is not actually a clean function-local
+  positive under Tier A's strict isolation rule, since the isolated
+  function contains neither the free nor the stale use. Worth treating
+  as a real Tier A limitation going forward, not just a Codex caveat.
+- Codex's proposed design was independently reviewed (not rubber-
+  stamped) before approval: it upgraded the old plain-text
+  `Vulnerable: yes/no` format to a structured JSON schema with a third
+  `indeterminate` verdict (avoids forcing false negatives when
+  isolation genuinely can't answer the question), proposed extracting
+  just the target function from LLVM IR instead of sending whole
+  modules (a real fix for the 2026-07-15 runaway-spend root cause, not
+  just a size-guard band-aid), and independently converged on
+  anonymizing recognizable function names - consistent with this
+  project's own Stage 3 decision to strip binaries in the first place.
+  Two items were correctly left as open questions rather than silently
+  defaulted: the per-run dollar ceiling and the skill's file location -
+  set to $5 (comfortably above the ~$1.90 baseline, tight enough to
+  still catch a repeat of the earlier incident) and
+  `classify-function-vulnerabilities/` at the repo root respectively.
+- **Verified independently after Codex reported completion** (its
+  self-report was not taken at face value): ran
+  `scripts/prepare_benchmark.py --repo-root . --output-dir
+  /tmp/tier-a-verify --model gpt-5.6-sol` directly. Confirmed: 60 tasks
+  generated (5 samples × 2 variants × 6 classes), 7,996 largest
+  estimated tokens, the $5 ceiling enforced in both
+  `prepare_benchmark.py` (pre-flight block before any API call) and
+  `run_benchmark.py` (per-request check), refusal detection that halts
+  the run immediately on the first refusal/invalid-output rather than
+  continuing or writing silent empty results, and - the concrete
+  numbers - `CVE-2021-42386`'s patched LLVM IR file reduced from
+  1,081,065 to exactly 611 bytes by extracting only the target function
+  and its direct type dependencies.
+- One real usability quirk found during verification (not a defect):
+  `--repo-root` defaults to the current working directory rather than
+  auto-detecting the repo root, so it only resolves correctly if run
+  from the repo root or with `--repo-root` passed explicitly.
+- Committed to `W2/skills-creation` (commit `e668974`): 12 files,
+  `SKILL.md` + `scripts/` + `references/` + `agents/openai.yaml`.
+  `__pycache__` excluded.
+- **Status**: skill built and verified via dry run only - no API calls
+  made, no money spent yet. Next step is the real dry-run-then-approve
+  flow through Codex itself, then scoring the results once run.
