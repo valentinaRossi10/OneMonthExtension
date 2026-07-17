@@ -99,6 +99,49 @@ decompiled file sizes) — staged spending plan (cheap dry run → one
 model → second model) proposed to the mentor rather than a single blind
 run.
 
+## Stage 8 — Codebase-level vulnerability confirmation (entry-point reachability) — not started
+
+Approved by supervisor 2026-07-17. Two-tier pipeline; the function-level
+tier is confirmed correct as already built:
+
+- **Tier A (function-level, methodology already built = Stage 1-5)**:
+  given one function in isolation, classify whether it looks vulnerable.
+  The *approach* is confirmed correct as-is (no methodology changes
+  needed) — but the existing hand-written scripts (`run_benchmark.py`,
+  `score.py`, etc.) are expected to be superseded by Codex-generated
+  automation for this tier too, per the working method below, not kept
+  as-is going forward.
+- **Tier B (codebase-level, new)**: given the *whole* codebase plus one
+  already-flagged candidate function, determine whether that function
+  is *actually* vulnerable by tracing reachability from **one specific
+  entry point** through the codebase — confirming the flagged function
+  is genuinely reachable/exploitable from that entry point, not just
+  pattern-matched in isolation. Tier B assumes the candidate function is
+  already known (from Tier A, or from ground truth like Stage 6/7's
+  `netgear_commonCgi`) and narrows to *confirming* it, not discovering
+  an unknown vulnerability from scratch across an entire binary.
+
+## Stage 9 — Dynamic analysis confirmation — not started
+
+Fuzzing pass to confirm Stage 8's findings — closes the loop on the
+project's original hybrid static + dynamic framing. Not yet scoped in
+detail; follows once Stage 8 is working.
+
+## Working method for Stage 8: Codex-based skill automation
+
+Per supervisor guidance: build Stage 8 using Codex in VS Code (full
+repo context available to the agent), rather than hand-writing
+prompts/scripts the way Stage 1-5 was built.
+
+1. Summarize the skill needed for the function-level task (Tier A) and
+   the skill needed for the codebase-level task (Tier B) — one skill
+   definition per tier.
+2. Let the agent (Codex) generate the actual Python automation —
+   scripts plus result files — from those skill definitions, rather
+   than hand-writing the scripts as in earlier stages.
+
+Branch: `W2/skills-creation`.
+
 ## Future possibilities
 
 **Containerize the environment (Docker).** Not needed for the current

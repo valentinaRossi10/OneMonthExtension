@@ -145,6 +145,54 @@ cross-product) against every function — running the full cross-product at
 this scale (~2,011 functions) would be ~5x the API cost for little added
 value here.
 
+## Stage 8 — Codebase-level vulnerability confirmation (planned, not started)
+
+An earlier draft of this stage (explored 2026-07-15/16, since discarded)
+proposed letting the model search an entire binary from scratch,
+choosing its own path via tools like string search and call-graph
+lookup, to *discover* an unknown vulnerability among hundreds of
+functions with no prior hint. The supervisor's guidance on 2026-07-17
+refined this into something more precisely scoped, and split it from
+what Stage 1-5's function-level tier already does correctly.
+
+**Two tiers, not one**:
+- **Tier A** is exactly Stage 1-5's approach: given one function in
+  isolation, classify whether it looks vulnerable. The methodology is
+  approved as-is — but not the existing hand-written scripts themselves,
+  which are expected to be superseded by Codex-generated automation for
+  this tier too (see working method below), same as Tier B.
+- **Tier B** is new: given the *whole codebase* plus a candidate
+  function that's already been flagged (by Tier A, or known from ground
+  truth), determine whether it's *actually* vulnerable by tracing
+  reachability from **one specific entry point**. This is a
+  confirmation task, not a discovery task — it assumes the "where to
+  look" question is already answered, and asks instead "is this
+  reachable and real, or a false positive that only looks dangerous in
+  isolation."
+
+**Why this framing is better than the earlier discarded draft**: Stage
+6/7's `netgear_commonCgi` case is exactly this shape — the unsafe
+`strcpy`/`system()` pattern only matters because it's reachable from the
+`/cgi-bin/` HTTP entry point through `parse_http_request` →
+`handle_get`. A function-level classifier can flag the *pattern*
+without ever confirming the *reachability* that makes it a real,
+exploitable bug versus dead code or an unreachable branch. Tier B
+targets exactly that gap, using the whole codebase as context rather
+than one isolated function.
+
+**Working method**: build Stage 8 using Codex in VS Code, which has
+full-repo context, rather than hand-writing prompts and scripts as in
+earlier stages. The task is to summarize the skill needed for each tier
+(one for Tier A's function-level task, one for Tier B's codebase-level
+task), then let the agent generate the actual Python automation —
+scripts and result files — from those skill definitions.
+
+**Stage 9** (dynamic analysis, fuzzing) follows to confirm Stage 8's
+findings, closing the loop on the project's original hybrid
+static + dynamic framing.
+
+Exploration branch: `W2/skills-creation`.
+
 ## Current status
 
 Both benchmarks (BusyBox calibration, real-firmware discovery) are fully

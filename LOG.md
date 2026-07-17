@@ -373,3 +373,67 @@ stage/status, see `PLAN.md`. Does not reference git commit hashes.
   `claude-fable-5`'s refusal issue is unresolved, so a clean run will
   still show 60/60 refusals on that side until that's separately
   addressed.
+- Also added an itemized false-negative listing to `score.py`'s console
+  output, mirroring the existing false-positive listing - false
+  negatives (missed real bugs) previously only showed up as an aggregate
+  percentage, not named individually, despite arguably being the more
+  important failure mode for a vulnerability-detection tool.
+
+## 2026-07-16 — Mentor's reply on the `claude-fable-5` refusal; model choice for now
+
+- Emailed Elaine with the fixed-monthly-plan confirmation, the repo link
+  (branch `W1/firmware-static-analysis`), and the `claude-fable-5`
+  refusal blocker, asking for guidance before making the actual
+  purchase.
+- Ningyu (mentor) replied: bypassing Claude's safety check isn't the
+  goal here - proceed with evaluation via ChatGPT/OpenAI for now. Noted
+  GPT's own safety checks are less strict than Claude's but may still
+  need some prompt-phrasing care to avoid triggering them.
+- **Decision**: proceed GPT-only (`gpt-5.6-sol`) for the time being.
+  `claude-fable-5` stays configured in `models.yaml` but isn't the
+  active path until/unless the refusal issue is separately resolved.
+- Opened `W2/skills-creation` to start exploring next week's "skills"
+  direction the mentor had mentioned. First draft (agentic, tool-using
+  exploration of an entire firmware binary with no prior hint - see
+  discarded draft below) was written before the 2026-07-17 supervisor
+  meeting and superseded by that meeting's more precise scoping - see
+  next entry. Draft reverted from the branch; not committed.
+
+## 2026-07-17 — Supervisor meeting: two-tier pipeline, entry-point reachability, Codex-based skills
+
+Met with supervisor. Three concrete decisions, replacing the
+speculative Stage 8 draft from the day before:
+
+1. **Approach approved as-is**: the function-level classification tier
+   (Stage 1-5's existing benchmark - one function in isolation, classify
+   whether it looks vulnerable). Methodology confirmed correct, but the
+   existing hand-written scripts (`run_benchmark.py`, `score.py`, etc.)
+   are expected to be superseded by Codex-generated automation for this
+   tier too, per point 4 below - not kept as-is going forward.
+2. **Codebase-level tier, scoped more precisely than the discarded
+   draft**: rather than having the model search an entire codebase from
+   scratch with no hint (the 2026-07-16 draft's approach), the actual
+   task is: given the *whole codebase* and a candidate function already
+   flagged as (potentially) vulnerable, determine whether it is
+   *actually* vulnerable by considering **one specific entry point** -
+   i.e. confirm real reachability/exploitability from that entry point
+   through the codebase, rather than re-discovering unknown
+   vulnerabilities blind. This is a confirmation task on top of the
+   function-level tier's output, not a replacement for it.
+3. **Dynamic analysis** (fuzzing) to confirm findings from the
+   codebase-level tier - closes the loop on the project's original
+   hybrid static + dynamic framing, mentioned since the very first
+   description of the project.
+4. **Skills, clarified**: work in Codex (VS Code), which has full-repo
+   context available to the agent. Task is to summarize the skill
+   needed for each tier - one for the function-level task, one for the
+   codebase-level task - then have the agent itself generate the actual
+   Python automation (scripts + result files) from those skill
+   definitions, rather than hand-writing scripts as in earlier stages.
+
+Recorded as Stage 8 (codebase-level confirmation) and Stage 9 (dynamic
+analysis) in `PLAN.md`/`PIPELINE.md`, replacing the discarded
+2026-07-16 draft. Branch: `W2/skills-creation`.
+
+**Status**: not started. Next concrete step is defining the two skill
+summaries (function-level, codebase-level) to hand to Codex.
