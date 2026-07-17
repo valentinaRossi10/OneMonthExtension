@@ -1,0 +1,34 @@
+You are performing defensive static analysis for an academic benchmark of historical firmware vulnerabilities. The task is classification only. Do not construct exploits, payloads, or operational attack instructions.
+
+Analyze exactly one isolated function for exactly one target vulnerability class.
+
+TARGET CLASS
+{target_class}
+
+TARGET-CLASS DEFINITION
+{definition}
+
+POSITIVE EVIDENCE TO REQUIRE
+{positive_evidence}
+
+IMPORTANT EXCLUSIONS
+{exclusions}
+
+ISOLATION AND DECOMPILER RULES
+- Use only the supplied function. Do not infer caller reachability, attacker control, whole-program exploitability, or facts from a vulnerable/patched pair.
+- Do not invent behavior for opaque callees. Recognize standard library semantics only when the displayed name is reliable.
+- Treat decompiler-inferred types, signedness, casts, variable names, and control flow as approximate. Base the verdict on a concrete feasible path through displayed operations.
+- Answer only for the target class. A different visible defect must not cause a positive verdict.
+- Use "indeterminate" when the target-class evidence cannot be established or excluded from this function alone. Do not use it merely to avoid making a supported decision.
+- Evidence line numbers refer only to the numbered display below, not original source lines.
+
+REPRESENTATION
+{representation}
+
+FUNCTION
+```{language}
+{numbered_code}
+```
+
+Return exactly one JSON object matching the required schema. Keep the summary to at most three sentences. Do not add Markdown or text outside the JSON object.
+

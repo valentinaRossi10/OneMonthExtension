@@ -1,0 +1,29 @@
+{
+  "policy_version": "tier-a-policy-v1",
+  "prompt_version": "tier-a-prompt-v1",
+  "schema_version": "tier-a-result-v1",
+  "classes": [
+    "heap-buffer-overflow",
+    "use-after-free",
+    "integer-overflow",
+    "null-pointer-dereference",
+    "out-of-bounds-read",
+    "command-injection"
+  ],
+  "limits": {
+    "max_code_chars": 50000,
+    "max_estimated_input_tokens": 16000,
+    "max_output_tokens": 400,
+    "max_requests": 60,
+    "max_retries": 2,
+    "max_budget_usd": 5.0
+  },
+  "known_limited_observability": [
+    {
+      "cve_id": "CVE-2021-42386",
+      "target_class": "use-after-free",
+      "reason": "The isolated nvalloc body does not show the freeing operation, retained stale alias, and later dereference needed to prove the indexed cross-function use-after-free."
+    }
+  ]
+}
+

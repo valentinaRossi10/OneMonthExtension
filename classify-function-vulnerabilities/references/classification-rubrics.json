@@ -1,0 +1,80 @@
+{
+  "heap-buffer-overflow": {
+    "definition": "A heap allocation can provide less capacity than writes performed through the returned region on a feasible path in this function.",
+    "positive_evidence": [
+      "Relate an allocation-size expression to the maximum bytes subsequently written.",
+      "Account for terminators, separators, loop counts, element widths, and pointer increments.",
+      "Allow an allocation-like opaque call only when its argument and returned-pointer use make that role locally plausible; lower confidence accordingly."
+    ],
+    "exclusions": [
+      "Do not flag an unsafe-looking copy without a locally supportable destination-capacity mismatch.",
+      "Do not count stack-only overflow or out-of-bounds read as this class.",
+      "Do not assume an opaque callee allocates a particular size beyond the displayed argument."
+    ]
+  },
+  "use-after-free": {
+    "definition": "A feasible path in this function releases an object while an alias remains live and later reads, writes, dereferences, or passes that stale reference.",
+    "positive_evidence": [
+      "Identify the release operation, the surviving alias, and the later use.",
+      "Track aliases through assignments, container fields, and pool-slot reuse when locally visible."
+    ],
+    "exclusions": [
+      "Allocation or pool reuse alone is insufficient without a locally visible stale use.",
+      "Do not invent freeing behavior for opaque callees.",
+      "Use indeterminate when the required free/use sequence necessarily lies outside the supplied function."
+    ]
+  },
+  "integer-overflow": {
+    "definition": "Bounded-width integer arithmetic can wrap or overflow on a feasible path and the corrupted value affects a security-relevant size, index, allocation, loop bound, pointer offset, or protection check in this function.",
+    "positive_evidence": [
+      "Establish a plausible operand range and the relevant signedness or width despite decompiler uncertainty.",
+      "Connect the overflow to a consequential local operation or to bypass of a local check.",
+      "Consider checks whose own addition, multiplication, or cast can overflow."
+    ],
+    "exclusions": [
+      "Arithmetic that can wrap but has no security-relevant local consequence is insufficient.",
+      "Do not treat every cast or unsigned wrap as a vulnerability.",
+      "State decompiler signedness uncertainty through confidence or indeterminate rather than silently assuming source types."
+    ]
+  },
+  "null-pointer-dereference": {
+    "definition": "A pointer can be NULL on a feasible path and this function dereferences it, performs pointer arithmetic requiring validity, or passes it to a locally recognized non-NULL-requiring operation before a sufficient guard.",
+    "positive_evidence": [
+      "Trace the pointer from a nullable local source or branch to the first unsafe use.",
+      "Account for short-circuit conditions and guards on every relevant path.",
+      "Treat standard C library operations such as strchr or strlen as requiring a valid pointer."
+    ],
+    "exclusions": [
+      "Do not assume every opaque call can return NULL unless local control flow supports that interpretation.",
+      "Do not flag a NULL value that is guarded before all dereferences.",
+      "Do not use caller preconditions that are not displayed."
+    ]
+  },
+  "out-of-bounds-read": {
+    "definition": "A feasible path computes a pointer or index outside a locally inferable readable object and then reads from that location in this function.",
+    "positive_evidence": [
+      "Connect a bound, object extent, or ring-buffer extent to the final index used by a read.",
+      "Re-evaluate bounds after every index adjustment, wraparound correction, cast, or subtraction.",
+      "Identify the actual read expression and the path reaching it."
+    ],
+    "exclusions": [
+      "Distinguish reads from writes and from arithmetic that never accesses memory.",
+      "Do not assume an object size solely from a decompiler-generated variable name.",
+      "Do not flag a path that exits before the read."
+    ]
+  },
+  "command-injection": {
+    "definition": "A string influenced by a function parameter or locally read input is incorporated into a command interpreted by a shell-capable sink in this function without adequate argument separation or validation.",
+    "positive_evidence": [
+      "Show local data flow from the input-like value through command construction to a recognized sink such as system, popen, or an explicit shell invocation.",
+      "Assess allowlists, metacharacter rejection, quoting, and fixed argument-vector execution when they are locally visible.",
+      "Classify the dangerous local pattern without claiming external reachability or attacker control."
+    ],
+    "exclusions": [
+      "String formatting alone is not command injection without a shell-capable sink.",
+      "Do not assume an opaque FUN_* callee invokes a shell without local evidence.",
+      "A fixed command with no parameter-derived content is insufficient."
+    ]
+  }
+}
+

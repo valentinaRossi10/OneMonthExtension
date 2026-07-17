@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tier A function classification result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_class",
+    "verdict",
+    "confidence",
+    "evidence_lines",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "tier-a-result-v1"
+    },
+    "target_class": {
+      "enum": [
+        "heap-buffer-overflow",
+        "use-after-free",
+        "integer-overflow",
+        "null-pointer-dereference",
+        "out-of-bounds-read",
+        "command-injection"
+      ]
+    },
+    "verdict": {
+      "enum": [
+        "vulnerable",
+        "not_vulnerable",
+        "indeterminate"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "evidence_lines": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "uniqueItems": true
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 800
+    }
+  }
+}
+

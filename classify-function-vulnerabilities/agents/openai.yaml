@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tier A Function Classifier"
+  short_description: "Classify isolated functions for vulnerability classes"
+  default_prompt: "Use $classify-function-vulnerabilities to build and run the guarded Tier A function-level vulnerability benchmark."
