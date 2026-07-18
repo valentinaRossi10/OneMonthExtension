@@ -10,14 +10,13 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from experiment_common import load_metadata, utc_now, write_metadata
 from tier_a_common import read_jsonl
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--results", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--run-dir", type=Path, required=True)
     return parser.parse_args()
 
 
@@ -103,8 +102,10 @@ def pair_category(vulnerable: dict[str, Any], patched: dict[str, Any]) -> str:
 
 def main() -> int:
     args = parse_args()
-    tasks = read_jsonl(args.manifest.resolve())
-    result_rows = read_jsonl(args.results.resolve())
+    run_dir = args.run_dir.resolve()
+    metadata = load_metadata(run_dir)
+    tasks = read_jsonl(run_dir / "manifest.jsonl")
+    result_rows = read_jsonl(run_dir / "results.jsonl")
     latest: dict[str, dict[str, Any]] = {}
     for result in result_rows:
         latest[result.get("cache_key", "")] = result
@@ -141,7 +142,7 @@ def main() -> int:
             }
         )
 
-    output_dir = args.output_dir.resolve()
+    output_dir = run_dir / "scoring"
     output_dir.mkdir(parents=True, exist_ok=True)
     scoring_path = output_dir / "scoring.csv"
     if scored:
@@ -225,6 +226,21 @@ def main() -> int:
     }
     summary_path = output_dir / "summary.json"
     summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    metadata["status"] = "scored"
+    metadata["scored_at_utc"] = utc_now()
+    metadata["metrics"] = summary["overall"]
+    metadata["scored_tasks"] = len(scored)
+    metadata["api_attempt_records"] = len(result_rows)
+    metadata["recorded_cumulative_cost_usd"] = sum(
+        float(
+            result.get("actual_cost_usd")
+            if result.get("actual_cost_usd") is not None
+            else result.get("estimated_worst_case_cost_usd") or 0
+        )
+        for result in result_rows
+    )
+    write_metadata(run_dir, metadata)
 
     print(json.dumps(summary["overall"], indent=2, sort_keys=True))
     print(f"Scoring rows: {scoring_path}")

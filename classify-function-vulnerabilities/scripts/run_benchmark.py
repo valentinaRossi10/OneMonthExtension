@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from experiment_common import load_metadata, write_metadata
 from tier_a_common import (
     build_prompt,
     estimate_cost_usd,
@@ -26,13 +27,30 @@ from tier_a_common import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--results", type=Path, required=True)
+    parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--input-price-per-million", type=float, required=True)
     parser.add_argument("--output-price-per-million", type=float, required=True)
     parser.add_argument("--budget-usd", type=float, default=5.0)
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY")
     parser.add_argument("--max-tasks", type=int)
+    parser.add_argument(
+        "--retry-reviewed-invalid-preflight",
+        action="store_true",
+        help=(
+            "Retry a cached invalid compatibility preflight after explicit review; "
+            "refusals remain non-retryable and all prior cost stays in the ledger."
+        ),
+    )
+    parser.add_argument(
+        "--retry-reviewed-invalid-task",
+        action="append",
+        default=[],
+        metavar="TASK_ID",
+        help=(
+            "Retry one specifically reviewed cached invalid task. Repeat the option "
+            "to authorize additional task IDs."
+        ),
+    )
     parser.add_argument(
         "--execute",
         action="store_true",
@@ -83,20 +101,26 @@ def classify_exception(exc: Exception) -> tuple[str, bool]:
     return "api_error", transient
 
 
-def call_openai(client: Any, task: dict[str, Any], prompt: str, max_output_tokens: int) -> dict[str, Any]:
+def call_openai(
+    client: Any,
+    task: dict[str, Any],
+    prompt: str,
+    max_output_tokens: int,
+    reasoning_effort: str | None,
+) -> dict[str, Any]:
     schema = load_result_schema()
     api_schema = {key: value for key, value in schema.items() if key not in {"$schema", "title"}}
     started = time.monotonic()
-    response = client.responses.create(
-        model=task["model"],
-        input=[
+    request: dict[str, Any] = {
+        "model": task["model"],
+        "input": [
             {
                 "role": "user",
                 "content": [{"type": "input_text", "text": prompt}],
             }
         ],
-        max_output_tokens=max_output_tokens,
-        text={
+        "max_output_tokens": max_output_tokens,
+        "text": {
             "format": {
                 "type": "json_schema",
                 "name": "tier_a_result",
@@ -104,7 +128,10 @@ def call_openai(client: Any, task: dict[str, Any], prompt: str, max_output_token
                 "schema": api_schema,
             }
         },
-    )
+    }
+    if reasoning_effort:
+        request["reasoning"] = {"effort": reasoning_effort}
+    response = client.responses.create(**request)
     latency = time.monotonic() - started
     text, refusal = response_text_and_refusal(response)
     usage = usage_dict(response)
@@ -163,8 +190,11 @@ def main() -> int:
     args = parse_args()
     policy = load_policy()
     limits = policy["limits"]
-    manifest_path = args.manifest.resolve()
-    results_path = args.results.resolve()
+    reviewed_invalid_task_ids = set(args.retry_reviewed_invalid_task)
+    run_dir = args.run_dir.resolve()
+    metadata = load_metadata(run_dir)
+    manifest_path = run_dir / "manifest.jsonl"
+    results_path = run_dir / "results.jsonl"
     manifest_dir = manifest_path.parent
 
     if not 0 < args.budget_usd <= limits["max_budget_usd"]:
@@ -177,6 +207,47 @@ def main() -> int:
     tasks = read_jsonl(manifest_path)
     if not tasks:
         raise ValueError("Manifest is empty")
+    reasoning_values = {task.get("reasoning_effort") for task in tasks}
+    if len(reasoning_values) != 1 or next(iter(reasoning_values)) not in {
+        "low",
+        "medium",
+        "high",
+    }:
+        raise ValueError("Manifest must freeze one reasoning effort: low, medium, or high")
+    reasoning_effort = next(iter(reasoning_values))
+    output_token_values = {task.get("estimated_max_output_tokens") for task in tasks}
+    if len(output_token_values) != 1:
+        raise ValueError("Manifest must freeze one maximum output-token setting")
+    max_output_tokens = next(iter(output_token_values))
+    if not isinstance(max_output_tokens, int) or not 0 < max_output_tokens <= limits["max_output_tokens"]:
+        raise ValueError("Manifest output-token setting exceeds the active safety policy")
+    if metadata.get("reasoning_effort") != reasoning_effort:
+        raise ValueError("Run metadata and manifest reasoning effort do not match")
+    models = {task.get("model") for task in tasks}
+    if len(models) != 1 or metadata.get("model") != next(iter(models)):
+        raise ValueError("Run metadata and manifest model do not match")
+    for field in ("policy_version", "prompt_version", "schema_version"):
+        values = {task.get(field) for task in tasks}
+        if len(values) != 1 or metadata.get(field) != next(iter(values)):
+            raise ValueError(f"Run metadata and manifest {field} do not match")
+    if metadata.get("max_output_tokens") != max_output_tokens:
+        raise ValueError("Run metadata and manifest output-token setting do not match")
+    for field, supplied in (
+        ("input_price_per_million", args.input_price_per_million),
+        ("output_price_per_million", args.output_price_per_million),
+    ):
+        recorded = metadata.get(field)
+        if not isinstance(recorded, (int, float)) or abs(float(recorded) - supplied) > 1e-12:
+            raise ValueError(
+                f"{field} differs from the prepared run; create a new run for changed pricing"
+            )
+    manifest_task_ids = {task["task_id"] for task in tasks}
+    unknown_reviewed_ids = reviewed_invalid_task_ids - manifest_task_ids
+    if unknown_reviewed_ids:
+        raise ValueError(
+            "Reviewed invalid task IDs are not in the manifest: "
+            + ", ".join(sorted(unknown_reviewed_ids))
+        )
     if len(tasks) > limits["max_requests"]:
         raise ValueError(
             f"Manifest has {len(tasks)} tasks, above max_requests={limits['max_requests']}"
@@ -217,21 +288,66 @@ def main() -> int:
         task["normalized_code_lines"] = len(code.splitlines())
         worst_cost = estimate_cost_usd(
             prompt_tokens,
-            limits["max_output_tokens"],
+            max_output_tokens,
             args.input_price_per_million,
             args.output_price_per_million,
         )
         assert worst_cost is not None
         prepared.append((task, prompt, worst_cost))
 
-    projected_cost = sum(item[2] for item in prepared)
+    preflight_tasks = choose_preflight([item[0] for item in prepared])
+    preflight_ids = {task["task_id"] for task in preflight_tasks}
+
+    prior_rows = read_jsonl(results_path)
+    latest_by_cache: dict[str, dict[str, Any]] = {}
+    cumulative_cost = 0.0
+    for row in prior_rows:
+        latest_by_cache[row.get("cache_key", "")] = row
+        recorded_cost = row.get("actual_cost_usd")
+        if recorded_cost is None:
+            recorded_cost = row.get("estimated_worst_case_cost_usd")
+        if recorded_cost is None:
+            raise ValueError(
+                "A prior result has neither actual nor worst-case cost; "
+                "cumulative spending cannot be bounded safely"
+            )
+        cumulative_cost += float(recorded_cost)
+
+    def is_terminal_cache(task: dict[str, Any], cached: dict[str, Any] | None) -> bool:
+        status = (cached or {}).get("status")
+        if (
+            status == "invalid_output"
+            and (
+                task["task_id"] in reviewed_invalid_task_ids
+                or (
+                    args.retry_reviewed_invalid_preflight
+                    and task["task_id"] in preflight_ids
+                )
+            )
+        ):
+            return False
+        return status in {"ok", "refusal", "invalid_output"}
+
+    remaining_projected_cost = sum(
+        worst_cost
+        for task, _, worst_cost in prepared
+        if not is_terminal_cache(task, latest_by_cache.get(task["cache_key"]))
+    )
+    projected_cost = cumulative_cost + remaining_projected_cost
     print(f"Selected tasks: {len(prepared)}")
-    print(f"Worst-case projected cost: ${projected_cost:.4f}")
+    print(f"Recorded cumulative cost: ${cumulative_cost:.4f}")
+    print(f"Worst-case remaining cost: ${remaining_projected_cost:.4f}")
+    print(f"Worst-case cumulative cost: ${projected_cost:.4f}")
     print(f"Hard run ceiling: ${args.budget_usd:.2f}")
     if projected_cost > args.budget_usd:
         print("BLOCKED: projected cost exceeds the run ceiling.", file=sys.stderr)
         return 2
     if not args.execute:
+        metadata["status"] = "dry-run"
+        metadata["last_dry_run_at_utc"] = utc_now()
+        metadata["last_projected_cumulative_cost_usd"] = projected_cost
+        metadata["approved_budget_usd"] = args.budget_usd
+        write_metadata(run_dir, metadata)
         print("Dry run only; no API calls were made. Add --execute after review.")
         return 0
 
@@ -246,32 +362,38 @@ def main() -> int:
         ) from exc
     client = OpenAI(api_key=api_key)
 
-    prior_rows = read_jsonl(results_path)
-    latest_by_cache: dict[str, dict[str, Any]] = {}
-    for row in prior_rows:
-        latest_by_cache[row.get("cache_key", "")] = row
-
     prepared_by_id = {task["task_id"]: (task, prompt, cost) for task, prompt, cost in prepared}
-    preflight_tasks = choose_preflight([item[0] for item in prepared])
     ordered_ids = [task["task_id"] for task in preflight_tasks]
     ordered_ids.extend(task["task_id"] for task, _, _ in prepared if task["task_id"] not in ordered_ids)
 
-    spent_or_committed = 0.0
+    spent_or_committed = cumulative_cost
     api_requests = 0
-    preflight_ids = {task["task_id"] for task in preflight_tasks}
     preflight_complete: set[str] = set()
 
     for task_id in ordered_ids:
         task, prompt, worst_cost = prepared_by_id[task_id]
         cached = latest_by_cache.get(task["cache_key"])
+        reviewed_retry = bool(
+            cached
+            and cached.get("status") == "invalid_output"
+            and (
+                task_id in reviewed_invalid_task_ids
+                or (args.retry_reviewed_invalid_preflight and task_id in preflight_ids)
+            )
+        )
+        if reviewed_retry:
+            print(f"REVIEWED RETRY {task_id}: prior invalid_output")
         if cached and cached.get("status") in {"ok", "refusal", "invalid_output"}:
-            print(f"CACHE {task_id}: {cached['status']}")
-            if task_id in preflight_ids:
+            if reviewed_retry:
+                cached = None
+            else:
+                print(f"CACHE {task_id}: {cached['status']}")
                 if cached["status"] != "ok":
-                    print("BLOCKED: cached compatibility preflight did not pass.", file=sys.stderr)
+                    print("BLOCKED: cached refusal or invalid output requires review.", file=sys.stderr)
                     return 3
-                preflight_complete.add(task_id)
-            continue
+                if task_id in preflight_ids:
+                    preflight_complete.add(task_id)
+                continue
 
         if task_id not in preflight_ids and preflight_complete != preflight_ids:
             print("BLOCKED: compatibility preflight is incomplete.", file=sys.stderr)
@@ -290,7 +412,13 @@ def main() -> int:
             api_requests += 1
             print(f"CALL {task_id} (attempt {attempts})")
             try:
-                outcome = call_openai(client, task, prompt, limits["max_output_tokens"])
+                outcome = call_openai(
+                    client,
+                    task,
+                    prompt,
+                    max_output_tokens,
+                    reasoning_effort,
+                )
                 transient = False
             except Exception as exc:  # Provider exceptions vary by SDK version.
                 status, transient = classify_exception(exc)
@@ -322,10 +450,12 @@ def main() -> int:
                 "cache_key": task["cache_key"],
                 "model": task["model"],
                 "provider": task["provider"],
+                "reasoning_effort": reasoning_effort,
                 "prompt_version": task["prompt_version"],
                 "code_sha256": task["code_sha256"],
                 "attempt": attempts,
                 "preflight": task_id in preflight_ids,
+                "reviewed_retry": reviewed_retry,
                 "estimated_worst_case_cost_usd": worst_cost,
                 "actual_cost_usd": actual_cost,
                 **outcome,
@@ -348,8 +478,14 @@ def main() -> int:
             time.sleep(min(2**attempts, 8))
 
     print(f"Completed. API requests this invocation: {api_requests}")
-    print(f"Observed/committed local cost estimate: ${spent_or_committed:.4f}")
+    print(f"Observed/committed cumulative cost estimate: ${spent_or_committed:.4f}")
     print(f"Results: {results_path}")
+    metadata["status"] = "executed"
+    metadata["last_executed_at_utc"] = utc_now()
+    metadata["recorded_cumulative_cost_usd"] = spent_or_committed
+    metadata["approved_budget_usd"] = args.budget_usd
+    metadata["api_attempt_records"] = len(read_jsonl(results_path))
+    write_metadata(run_dir, metadata)
     return 0
 
 

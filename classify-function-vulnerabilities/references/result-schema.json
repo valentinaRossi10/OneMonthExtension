@@ -13,9 +13,11 @@
   ],
   "properties": {
     "schema_version": {
+      "type": "string",
       "const": "tier-a-result-v1"
     },
     "target_class": {
+      "type": "string",
       "enum": [
         "heap-buffer-overflow",
         "use-after-free",
@@ -26,6 +28,7 @@
       ]
     },
     "verdict": {
+      "type": "string",
       "enum": [
         "vulnerable",
         "not_vulnerable",
@@ -42,8 +45,7 @@
       "items": {
         "type": "integer",
         "minimum": 1
-      },
-      "uniqueItems": true
+      }
     },
     "summary": {
       "type": "string",
@@ -52,4 +54,3 @@
     }
   }
 }
-

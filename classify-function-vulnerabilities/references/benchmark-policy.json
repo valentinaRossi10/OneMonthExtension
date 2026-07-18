@@ -1,7 +1,10 @@
 {
-  "policy_version": "tier-a-policy-v1",
+  "policy_version": "tier-a-policy-v4",
   "prompt_version": "tier-a-prompt-v1",
   "schema_version": "tier-a-result-v1",
+  "model_settings": {
+    "reasoning_effort": "low"
+  },
   "classes": [
     "heap-buffer-overflow",
     "use-after-free",
@@ -13,7 +16,7 @@
   "limits": {
     "max_code_chars": 50000,
     "max_estimated_input_tokens": 16000,
-    "max_output_tokens": 400,
+    "max_output_tokens": 1900,
     "max_requests": 60,
     "max_retries": 2,
     "max_budget_usd": 5.0
@@ -26,4 +29,3 @@
     }
   ]
 }
-

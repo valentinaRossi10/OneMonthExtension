@@ -498,3 +498,154 @@ summaries (function-level, codebase-level) to hand to Codex.
 - **Status**: skill built and verified via dry run only - no API calls
   made, no money spent yet. Next step is the real dry-run-then-approve
   flow through Codex itself, then scoring the results once run.
+
+## 2026-07-18 — API budget purchase, real Tier A dry run
+
+- Before purchasing, sent Ms. Chow (Elaine) the decision + cost
+  estimate + a billing-page screenshot as quotation, per her request to
+  be informed before any purchase/subscription. Kept this request
+  scoped to the new incremental need (~$10) rather than the earlier
+  2026-07-15 runaway-spend debt - that debt was cleared separately, out
+  of pocket, as a deliberate choice to keep it distinct from what's
+  being asked of the mentor/Elaine to approve.
+- Cleared the account's outstanding negative balance (-$17.31 -> $0.00,
+  confirmed on the actual Billing -> Overview page rather than trusting
+  the purchase-confirmation modal's own math, which showed inconsistent
+  numbers - "negative balance settlement: -$0.00" alongside "estimated
+  balance after purchase" that didn't obviously account for the debt).
+  Then purchased $10 in OpenAI credit for the actual Tier A run, per
+  supervisor conversation, without waiting on Elaine's email reply
+  first this time.
+- Ran the real dry run (not a local `prepare_benchmark.py` check this
+  time, but the actual Codex-invoked flow) via the
+  `classify-function-vulnerabilities` skill. Reported: 60 tasks (5
+  samples x 2 variants x 6 classes), 0 guarded/unavailable, 5 expected
+  positives / 55 negatives, largest input 11,885 characters / 7,996
+  estimated prompt tokens, worst-case projected cost **$2.1196** against
+  the $5 ceiling ($2.8804 margin), $0 actually spent, execution paused
+  pending explicit approval.
+- **Independently reproduced, not taken at face value**: ran
+  `prepare_benchmark.py --repo-root . --output-dir <tmp> --model
+  gpt-5.6-sol --input-price-per-million 5.0 --output-price-per-million
+  30.0` directly. Got the exact same numbers - 60/60 ready tasks,
+  $2.1196 worst-case cost, 11,885/7,996 largest input. One implementation
+  detail worth knowing: pricing isn't auto-looked-up - the script needs
+  `--input-price-per-million`/`--output-price-per-million` passed
+  explicitly, or it silently estimates $0 cost. Codex's flow presumably
+  supplies these itself; a bare manual invocation without them would
+  give a misleadingly reassuring "free" estimate.
+- **Status**: dry run verified and matches independently. Not yet
+  approved to execute for real - next step is authorizing the actual
+  $5-ceiling run through Codex, then scoring against
+  `samples/index.csv`.
+
+## 2026-07-18 — Tier A benchmark executed and scored
+
+- Completed the full 60-task cross-product with `gpt-5.6-sol`: 5 samples
+  x 2 variants x 6 target classes. All 60 latest task records have
+  `status=ok`; there were no refusals in the final result set.
+- The compatibility gate caught two real integration problems before a
+  full release: the first structured-output schema lacked explicit string
+  types, and the initial 400-token output cap was consumed by reasoning
+  before JSON was emitted. The schema was corrected, cumulative spending
+  across resumed invocations was added to the runner, and reviewed retries
+  were made exact-task-only. Output caps were raised under explicit
+  approval (1,200, then 1,900 tokens) while retaining the hard $5 ceiling.
+- Cost: **$1.858540** usage-derived estimate at the configured uncached
+  prices; **$1.889030** conservative cumulative ledger, including a
+  worst-case reserve for the schema-rejected request. This stayed
+  $3.110970 below the $5 ceiling.
+- Overall scoring: TP=3, FN=1, TN=35, FP=11, abstentions=10; decision
+  coverage 83.33%, recall 60%, observable-positive recall 75%, precision
+  21.43%, specificity 63.64%, false-positive rate 20%, balanced accuracy
+  61.82%, strict accuracy 63.33%, F1 31.58%.
+- The designated function-local observability limitation behaved as
+  expected: `CVE-2021-42386__vulnerable__use-after-free` was the sole
+  false negative because isolated `nvalloc` does not contain the full
+  free/stale-alias/use sequence. The out-of-bounds-read positive was an
+  abstention. Heap-buffer-overflow and null-pointer-dereference produced
+  correct vulnerable-to-patched transitions; the integer-overflow patched
+  variant remained positive.
+- Recovery caveat: successful cached results were not repeated. Of the 60
+  final results, 3 used the provider-default reasoning setting and 57 used
+  `low`; 50 used a 1,200-token cap and the final 10 used 1,900. Treat this
+  as a run-engineering limitation when comparing fine-grained behavior.
+- Artifacts were later migrated without content changes to
+  `results/tier-a/runs/2026-07-18__gpt-5-6-sol__mixed-recovered/`; see the
+  repository-cleanup and multi-run entries below.
+
+## 2026-07-18 — Repository reconciled with the current two-tier methodology
+
+- Audited the repository after the Tier A run and made the implemented
+  workflow canonical across `README.md`, `PIPELINE.md`, `PLAN.md`, and the
+  component READMEs. Tier A is now consistently described as completed
+  isolated-function classification; Tier B is planned codebase-level
+  confirmation from one already-flagged candidate and one specific entry
+  point; dynamic confirmation remains future work.
+- Reclassified the Netgear CVE-2016-6277 material as Tier B ground truth,
+  not a built blind-discovery benchmark. The repository contains selected
+  pseudo-code and metadata, but not the complete 2,011-function export,
+  Tier B automation, or Tier B results. The expected confirmation case is
+  `parse_http_request` -> `handle_get` -> `netgear_commonCgi`.
+- Removed the unreferenced root `prompts/` templates, `scripts/models.yaml`,
+  and root `scripts/requirements.txt`. They belonged to the superseded
+  plain-text, multi-provider workflow and conflicted with the reviewed
+  class rubrics, strict JSON schema, and guarded OpenAI runner in
+  `classify-function-vulnerabilities/`. They remain recoverable from git
+  history.
+- Kept `scripts/ghidra/ExportAllFunctions.java` as useful extraction support
+  for assembling a future Tier B whole-codebase input. Updated the Tier A
+  skill to document exact-task reviewed retries and reconstruction of the
+  cumulative spend from the append-only `results.jsonl` ledger.
+- No benchmark inputs, API responses, or scored Tier A results were changed
+  by this cleanup.
+
+## 2026-07-18 — Tier A multi-run experiment storage added
+
+- Replaced the single mutable `results/tier-a/` output location with unique
+  `results/tier-a/runs/<run-id>/` experiment directories. Preparation now
+  refuses an existing run ID, so changing model or reasoning settings cannot
+  overwrite a previous experiment.
+- Added `run-metadata.json` and a generated README to every run. They record
+  UTC date, model, reasoning effort, output cap, policy/prompt/schema versions,
+  prices, budget, experiment notes, status, metrics, and automatic
+  configuration differences from the previous run.
+- Froze reasoning effort in each manifest and added reasoning, output cap,
+  policy, and schema versions to cache identity. The executor now uses the
+  manifest's frozen reasoning setting rather than the live policy setting.
+- Added pairwise comparison automation producing configuration changes,
+  metric deltas, and task-level category/verdict changes under
+  `results/tier-a/comparisons/`, with no API calls.
+- Migrated the completed run to
+  `results/tier-a/runs/2026-07-18__gpt-5-6-sol__mixed-recovered/`. SHA-256
+  checks confirmed its manifest, API ledger, scoring CSV, and summary were
+  unchanged. Its README explicitly records the mixed recovery configuration
+  (3 provider-default/57 low reasoning; 50 tasks at a 1,200-token cap and 10
+  at 1,900), so it is not misrepresented as a uniform-low experiment.
+
+## 2026-07-18 — Static experiment protocol and Tier B handoff clarified
+
+- Added `EXPERIMENT.md` as the canonical protocol so research questions,
+  task units, labels, information boundaries, metrics, escalation rules, and
+  reporting claims are no longer implicit or distributed across the pipeline,
+  plan, skill, and result documentation.
+- Kept Tier A as a strict three-way classifier because false positives are
+  already a material result. `indeterminate` remains an abstention with no
+  correctness credit; the known OOB-read abstention was not retroactively
+  relabeled as a true positive.
+- Separated strict scoring from downstream selection. The basic cascade sends
+  both `vulnerable` and `indeterminate` tasks to Tier B. On the recovered run,
+  this forwards 24/60 task-class combinations, including 4/5 indexed positives
+  and all 4/4 function-locally observable positives. The cross-function UAF
+  remains the designated Tier A observability limitation.
+- Defined three non-interchangeable evaluations: standalone Tier A; Tier B
+  with oracle candidates independent of Tier A; and the operational Tier A →
+  Tier B cascade. Oracle Tier B must include all five known BusyBox candidates
+  and patched controls (up to 10 cases) so both sensitivity and specificity
+  are measurable. A removed patched function is recorded as absence, not
+  replaced with an artificial function.
+- Required one fixed entry point and reproducible whole-codebase package per
+  Tier B case. Expected labels, CVE descriptions, paired diffs, manual paths,
+  and exploitability conclusions remain hidden from the model. Tier B and
+  cascade performance must not be claimed until their automation and runs
+  actually exist.

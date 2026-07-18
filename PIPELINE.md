@@ -5,6 +5,8 @@ walkthrough of the pipeline as it exists today, with a brief note on
 *why* each major decision was made. For full chronological detail
 (debugging steps, exact commands, every dead end), see `LOG.md`. For the
 current stage checklist and next actions, see `PLAN.md`.
+For the normative task matrices, labels, handoff policy, metrics, and reporting
+boundaries, see `EXPERIMENT.md`.
 
 ## Goal
 
@@ -41,8 +43,9 @@ PANGOLIN). Since this project uses an LLM as the analysis engine, the
 pseudo-C paradigm is the closer precedent — confirmed by the mentor's
 reply: pseudo-code is the primary representation, with IR/disassembly as
 an explicit fallback for cases where decompilation fails or looks
-incomplete. LLVM IR is kept and used automatically as that fallback
-(`run_benchmark.py` checks for pseudo-C first, falls back to `.ll`).
+incomplete. LLVM IR is kept as that fallback. The Tier A preparer chooses
+pseudo-C first and extracts only the target function from LLVM IR when a
+pseudo-C variant is unavailable.
 
 ## Stage 3 — Compile, strip, and decompile the 5 samples
 
@@ -69,31 +72,51 @@ Ghidra decompilation itself was done manually via the GUI, one function
 at a time, using string-literal searches and structural matching to
 locate each target function in a stripped binary with no symbol names.
 
-## Stage 4-5 — Prompt design and automated benchmark
+## Stage 4-5 — Tier A prompt design and automated benchmark
 
-One prompt template per bug class, each describing the pattern in
-pseudo-C terms and requesting a structured, parseable verdict
-(`Vulnerable: yes/no`, function/line, bug class, confidence, reasoning).
+Tier A uses a common isolated-function classification scaffold plus a
+class-specific rubric for each of the six supported vulnerability
+classes. The prompt explicitly forbids caller/callee assumptions and
+exploitability claims, and requests one strict JSON object containing the
+verdict (`vulnerable`, `not_vulnerable`, or `indeterminate`), confidence,
+evidence, and short reasoning. The canonical prompt construction and
+rubrics live in `classify-function-vulnerabilities/`; the earlier root
+prompt templates have been retired.
 
-**Why the benchmark runs every prompt against every sample (a full
-cross-product), not just each sample's matching prompt**: running only
+**Why the benchmark runs every class against every sample (a full
+cross-product), not just each sample's matching class**: running only
 matched pairs only measures "can it find the bug when told exactly what
-class to look for" — it never tests whether a prompt stays quiet on code
-that doesn't have that bug, so mismatched-prompt false positives were
+class to look for" — it never tests whether the classifier stays quiet on
+code that doesn't have that bug, so mismatched-class false positives are
 never exercised. The cross-product design lets the scorer distinguish
-"the specialized prompt correctly found the real bug" from "an unrelated
-prompt hallucinated one" (`true_positive`/`false_negative`/
-`true_negative`/`false_positive` categories in `results/scoring.csv`).
+"the class-specific check correctly found the real bug" from "an
+unrelated class check hallucinated one." The task-level records and
+aggregate metrics are stored inside each experiment under
+`results/tier-a/runs/<run-id>/scoring/`.
 
-Not yet run end-to-end — blocked on API budget approval (see below).
+The runner is intentionally fail-closed: it prepares and validates the
+complete 60-task manifest before API use, rejects oversized or malformed
+inputs, treats refusals/invalid JSON as explicit non-scorable outcomes,
+and enforces the hard cumulative USD ceiling before every request. A
+retry is allowed only for the exact reviewed task and remains inside the
+same cumulative ledger and ceiling. Every experiment has an immutable run
+directory, frozen model/reasoning configuration, and a README describing
+how it differs from the preceding experiment; scored runs can be compared
+at both metric and task level without further API calls.
 
-## Stage 6 — Real firmware proof-of-concept
+The Codex-generated Tier A benchmark was run end-to-end on 2026-07-18:
+60/60 tasks returned valid structured results and were scored. See
+`results/tier-a/` and the corresponding `LOG.md` entry for metrics, cost,
+and the configuration-recovery caveat.
 
-Stage 1-5 validated the *methodology* on binaries fully under our
-control (self-compiled, x86-64, single self-contained functions). None of
-that tests a real, unmodified vendor binary, a different CPU architecture,
-a different bug class, or genuine discovery (finding a bug without being
-told where to look).
+## Stage 6-7 — Real firmware ground truth for Tier B
+
+Stage 1-5 validated isolated-function classification on binaries fully
+under our control (self-compiled, x86-64, single functions). The Netgear
+case adds a real, unmodified vendor binary, a different CPU architecture,
+and command injection. It currently provides researched ground truth for
+Tier B; it is not a completed or runnable whole-binary discovery
+benchmark in this repository.
 
 **Target**: CVE-2016-6277, an unauthenticated command injection on the
 Netgear R6400/R7000 router (`/cgi-bin/;<command>`), in `usr/sbin/httpd`.
@@ -114,25 +137,21 @@ front of it, which closes the documented exploit but leaves the
 underlying unsafe pattern in place, and doesn't block every shell
 metacharacter (e.g. `|`, `&`, `>`, `<`).
 
-**Key methodology decision — ground truth vs. what the LLM sees.** The
-first draft of this phase had us manually locate the one known-vulnerable
-function and hand *only that function* to the LLM — which would have
-just repeated Stage 3's methodology on an uglier binary, testing nothing
-new (no real discovery, no way to test cross-binary reasoning). Corrected
-this: manual Ghidra work is for establishing ground truth only; the LLM
-is shown *every* function in the binary (1004 vulnerable + 1007 patched,
-bulk-decompiled via a custom headless Ghidra script), scored on whether
-it correctly picks out the one real vulnerable function among hundreds
-and stays quiet on everything else.
+**Key methodology decision — ground truth vs. what the LLM will see.** An
+earlier design proposed showing the LLM every function and asking it to
+discover the vulnerable function. That is no longer the intended next
+tier. Tier B starts with the already-flagged candidate
+`netgear_commonCgi`, one specific entry point (`parse_http_request`), and
+the whole available codebase; it asks whether the candidate is reachable
+and genuinely vulnerable from that entry point. Manual Ghidra work is
+used only to establish the candidate, entry point, and expected path
+through `handle_get`, not as model evidence.
 
-**A related scoping question, deliberately left unresolved for now**:
-even "every function in one binary" is still a hint (which binary to even
-look at, out of ~127 in a typical firmware image). Deciding *which*
-binary is worth deep analysis is itself a hard, named problem in the
-literature (MANGODFA calls it "border binary" selection, and cites real
-missed vulnerabilities caused by earlier tools' selection heuristics).
-Solving that is out of scope for this proof-of-concept — noted explicitly
-as a harder future step, not silently absorbed into this phase's claims.
+Selecting the binary or discovering an unknown candidate across a
+firmware image remains out of scope. It is a separate hard problem
+(described as "border binary" selection in MANGODFA) and is not measured
+by either the completed Tier A benchmark or the planned Tier B
+confirmation task.
 
 **Also deliberately out of scope**: replicating the reference papers'
 actual scale. Their headline results are large-scale zero-day discovery
@@ -140,10 +159,11 @@ across 14-1,698 real firmware images (teams of researchers, months of
 work); this project's one-CVE, one-binary proof-of-concept is a
 calibration step for that, not an attempt to match it.
 
-Scoped to run only the command-injection prompt (not the full 5-prompt
-cross-product) against every function — running the full cross-product at
-this scale (~2,011 functions) would be ~5x the API cost for little added
-value here.
+The repository currently retains selected vulnerable/patched pseudo-code,
+ground-truth metadata, and the reusable headless Ghidra export script. It
+does not retain a complete 2,011-function corpus or a Tier B prompt,
+runner, manifest, or results. Those must be designed and costed before a
+Tier B execution can be claimed.
 
 ## Stage 8 — Codebase-level vulnerability confirmation (planned, not started)
 
@@ -157,10 +177,9 @@ what Stage 1-5's function-level tier already does correctly.
 
 **Two tiers, not one**:
 - **Tier A** is exactly Stage 1-5's approach: given one function in
-  isolation, classify whether it looks vulnerable. The methodology is
-  approved as-is — but not the existing hand-written scripts themselves,
-  which are expected to be superseded by Codex-generated automation for
-  this tier too (see working method below), same as Tier B.
+  isolation, classify whether it looks vulnerable. Its Codex-generated
+  skill, guarded runner, and completed result set are now the canonical
+  implementation.
 - **Tier B** is new: given the *whole codebase* plus a candidate
   function that's already been flagged (by Tier A, or known from ground
   truth), determine whether it's *actually* vulnerable by tracing
@@ -169,6 +188,16 @@ what Stage 1-5's function-level tier already does correctly.
   look" question is already answered, and asks instead "is this
   reachable and real, or a false positive that only looks dangerous in
   isolation."
+
+**Three evaluations, kept separate**: Tier A is scored strictly, so
+`indeterminate` remains an abstention rather than being relabeled positive.
+Tier B is first evaluated with oracle candidates on all five known BusyBox
+vulnerable/patched pairs, independent of Tier A, so Tier B capability is not
+confounded by candidate selection. A later cascade experiment forwards both
+Tier A `vulnerable` and `indeterminate` cases to Tier B and measures selection
+recall, surviving false positives, and workload. This lets a suspicious but
+context-limited result such as the OOB-read abstention reach Tier B without
+weakening Tier A's already-challenging false-positive threshold.
 
 **Why this framing is better than the earlier discarded draft**: Stage
 6/7's `netgear_commonCgi` case is exactly this shape — the unsafe
@@ -180,12 +209,14 @@ exploitable bug versus dead code or an unreachable branch. Tier B
 targets exactly that gap, using the whole codebase as context rather
 than one isolated function.
 
-**Working method**: build Stage 8 using Codex in VS Code, which has
-full-repo context, rather than hand-writing prompts and scripts as in
-earlier stages. The task is to summarize the skill needed for each tier
-(one for Tier A's function-level task, one for Tier B's codebase-level
-task), then let the agent generate the actual Python automation —
-scripts and result files — from those skill definitions.
+**Working method**: Tier A has been implemented and run from its reviewed
+skill definition. For Tier B, first review a separate skill definition
+that fixes the candidate, entry point, allowed context, output schema,
+evaluation rules, and spending safeguards; only then generate automation
+and prepare a dry-run manifest for approval.
+
+The complete normative protocol, including model-visible information and
+what may be claimed from each evaluation, is in `EXPERIMENT.md`.
 
 **Stage 9** (dynamic analysis, fuzzing) follows to confirm Stage 8's
 findings, closing the loop on the project's original hybrid
@@ -195,13 +226,12 @@ Exploration branch: `W2/skills-creation`.
 
 ## Current status
 
-Both benchmarks (BusyBox calibration, real-firmware discovery) are fully
-built and verified, blocked only on API budget approval. Estimated cost:
-~$1.90 for the BusyBox benchmark, ~$50-70 for the firmware benchmark
-across both configured models (measured from actual file sizes, not
-guessed) — see the email thread with the mentor for the full breakdown
-and the staged spending plan (cheap dry run → one model → second model)
-proposed to keep the larger run from being a blind, single-shot spend.
+The BusyBox Tier A calibration is complete: all 60 cross-product tasks
+were executed and scored under the $5 ceiling, with a $1.889030
+conservative local cost ledger. Netgear CVE-2016-6277 has documented
+ground truth and selected decompiled functions, but Tier B automation and
+a complete codebase input package have not yet been built. Dynamic
+confirmation is also not started.
 
 ## Repo structure
 
@@ -210,8 +240,11 @@ samples/       CVE source (vulnerable/patched pairs), the ground truth
 ir/            LLVM IR — fallback representation, not primary anymore
 binaries/      Compiled, linked, stripped executables for the 5 samples
 pseudo-code/   Ghidra-decompiled pseudo-C for the 5 samples (primary input)
-prompts/       One prompt template per bug class
-scripts/       Benchmark runners + scorers (BusyBox and firmware variants)
-firmware/      Real-firmware phase: ground truth, ground_truth.csv, ExportAllFunctions.java
-results/       Raw model output + scoring, once runs happen
+classify-function-vulnerabilities/  Canonical Tier A skill and automation
+.codex/skills/ Skill discovery link for new Codex sessions
+scripts/       Reusable Ghidra extraction support
+firmware/      Tier B case-study ground truth and selected pseudo-code
+results/tier-a/ Immutable Tier A runs plus derived run comparisons
+skills/        Methodology/design provenance notes
+EXPERIMENT.md  Canonical experiment protocol and reporting rules
 ```

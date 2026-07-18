@@ -57,11 +57,11 @@ one artificially (e.g. picking one of the many scattered `xzalloc` call
 sites) would misrepresent the fix and wouldn't be a fair vulnerable/patched
 comparison for the benchmark.
 
-This is handled automatically by `scripts/run_benchmark.py`, which already
+This is handled automatically by
+`classify-function-vulnerabilities/scripts/prepare_benchmark.py`, which
 falls back to `ir/CVE-2021-42386-busybox/patched.ll` when no matching
-pseudo-code file exists — a legitimate use of the documented IR-fallback
-path (per the mentor's guidance: fall back to IR when pseudo-code can't
-represent the target), not a gap to fill in later.
+pseudo-code file exists and extracts only the indexed target function — a
+legitimate use of the documented IR-fallback path, not a gap to fill later.
 
 ## Resolved: CVE-2026-29004 initially missing the vulnerable code path
 

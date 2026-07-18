@@ -1,0 +1,53 @@
+{
+  "api_attempt_records": 64,
+  "created_at_utc": "2026-07-18T00:00:00+00:00",
+  "differences_from_previous": [
+    {
+      "current": "first recorded run",
+      "field": "baseline",
+      "previous": null
+    }
+  ],
+  "experiment_notes": [
+    "Recovered baseline from the original Tier A execution after multi-run storage was introduced.",
+    "The run resumed successful cached tasks during integration recovery: 3 final responses used provider-default reasoning and 57 used low reasoning; 50 used a 1200-token output cap and 10 used 1900."
+  ],
+  "hard_budget_ceiling_usd": 5.0,
+  "input_price_per_million": 5.0,
+  "max_output_tokens": "mixed: 1200 and 1900",
+  "metadata_version": "tier-a-run-v1",
+  "metrics": {
+    "balanced_accuracy": 0.6181818181818182,
+    "counts": {
+      "abstention": 10,
+      "false_negative": 1,
+      "false_positive": 11,
+      "true_negative": 35,
+      "true_positive": 3
+    },
+    "decision_coverage": 0.8333333333333334,
+    "end_to_end_recall": 0.6,
+    "end_to_end_specificity": 0.6363636363636364,
+    "expected_negatives": 55,
+    "expected_positives": 5,
+    "f1": 0.3157894736842105,
+    "false_positive_rate": 0.2,
+    "observable_positive_recall": 0.75,
+    "precision": 0.21428571428571427,
+    "strict_accuracy": 0.6333333333333333,
+    "tasks": 60
+  },
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "policy_version": "tier-a-policy-v4",
+  "previous_run_id": null,
+  "previous_run_path": null,
+  "prompt_version": "tier-a-prompt-v1",
+  "reasoning_effort": "mixed: provider-default and low",
+  "recorded_cumulative_cost_usd": 1.88903,
+  "run_date_utc": "2026-07-18",
+  "run_id": "2026-07-18__gpt-5-6-sol__mixed-recovered",
+  "schema_version": "tier-a-result-v1",
+  "scored_tasks": 60,
+  "status": "scored"
+}

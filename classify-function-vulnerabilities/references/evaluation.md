@@ -24,6 +24,24 @@ For `status=ok` and decisive verdicts:
 
 Categorize `indeterminate` as `abstention`. Categorize refusal, invalid output, API error, guard skip, unavailable input, and missing output separately. Give none of these correctness credit and never turn them into true negatives.
 
+## Downstream handoff
+
+Tier A scoring and Tier B selection use different thresholds. Preserve strict
+Tier A categories, but form the basic Tier B cascade queue from both
+`vulnerable` and `indeterminate` verdicts. Forwarding an `indeterminate` task
+does not convert its category from abstention to true positive.
+
+Report queue size and percentage, indexed-positive selection recall,
+observable-positive selection recall, and candidate count after deduplicating
+compatible function/variant cases. The completed recovered run forwards 24/60
+task-class combinations, 4/5 indexed positives, and 4/4 observable positives;
+these are run-specific descriptive values.
+
+Evaluate Tier B separately on oracle candidates—including vulnerable and
+patched controls—before evaluating the Tier A-selected cascade. This prevents
+Tier A misses from being mistaken for Tier B failures and permits Tier B
+specificity measurement.
+
 ## Metrics
 
 Report total tasks, expected positives/negatives, TP/FN/TN/FP, abstentions, failure statuses, decision coverage, end-to-end recall, precision, end-to-end specificity, false-positive rate, F1, balanced accuracy, and per-class results. Prefer macro/per-class interpretation over raw accuracy because the six-class cross-product is heavily negative.

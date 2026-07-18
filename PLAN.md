@@ -2,6 +2,8 @@
 
 Stage checklist and how-to reference. For *why* each decision was made,
 see `PIPELINE.md`. For full chronological/debugging detail, see `LOG.md`.
+For normative labels, information boundaries, handoff rules, evaluation
+matrices, and metrics, see `EXPERIMENT.md`.
 
 ## Stage 0 — Environment setup — done
 
@@ -22,82 +24,72 @@ index; `samples/<cve>/info.md` documents each one.
 ```bash
 clang -S -emit-llvm -g -O0 <file.c> -o <file.ll>
 ```
-`ir/<sample>/{vulnerable,patched}.ll`. Used automatically by
-`run_benchmark.py` only when pseudo-code is missing.
+`ir/<sample>/{vulnerable,patched}.ll`. The Tier A preparer uses it only
+when pseudo-code is missing and extracts the target function rather than
+sending the whole LLVM module.
 
 ## Stage 3 — Compile, strip, decompile the 5 samples — done
 
 `binaries/<sample>/{vulnerable,patched}` (linked, stripped executables) →
 `pseudo-code/<sample>/{vulnerable,patched}.c` (Ghidra decompiled). 4 full
-vulnerable/patched pairs + `CVE-2021-42386`'s intentional vulnerable-only
-case (the fix removes the function entirely; `run_benchmark.py` falls
-back to IR for that one variant).
+vulnerable/patched pairs + `CVE-2021-42386`'s intentional pseudo-C
+vulnerable-only case (the fix removes the source-level function; Tier A
+uses the small function-only LLVM fallback for the patched variant).
 
-## Stage 4 — Prompt templates per bug class — done
+## Stage 4 — Tier A prompt and rubric design — done
 
-`prompts/memory-{buffer-overflow,use-after-free,integer-overflow,
-null-pointer-dereference,out-of-bounds-read}.md` + `command-injection.md`
-(for Stage 7). Each requests a structured response:
-```
-Vulnerable: yes/no
-Function/line: <...>
-Bug class: <specific-class> / none
-Confidence: low/medium/high
-Reasoning: <1-3 sentences>
-```
-`scripts/bug_classes.py` maps each sample's `bug_class` to its template.
+The canonical implementation is `classify-function-vulnerabilities/`.
+It combines a common isolated-function prompt scaffold with one reviewed
+rubric per vulnerability class and requests strict JSON with a
+three-valued verdict, confidence, evidence, and reasoning. The legacy
+root prompt templates and model registry were removed so they cannot be
+mistaken for the active methodology.
 
-## Stage 5 — Automated benchmark — built, not yet run
+## Stage 5 — Tier A automated benchmark — done
 
-```bash
-python3 scripts/run_benchmark.py   # full cross-product: every prompt x every sample x every model
-python3 scripts/score.py           # -> results/scoring.csv
-```
+The skill prepares the full 5 samples × 2 variants × 6 classes = 60-task
+manifest, validates input size and provenance, projects cost without API
+calls, and executes only after approval under a hard cumulative ceiling.
+The completed run used a $5 ceiling and a conservative local ledger of
+$1.889030. Each experiment is stored under
+`results/tier-a/runs/<run-id>/`:
 
-### Getting API access
+- `README.md` and `run-metadata.json`: date, model, reasoning, notes, and
+  configuration differences from the previous experiment
+- `manifest.jsonl`: immutable task definitions and prompt hashes
+- `manifest-summary.json`: input, token, guard, and projected-cost totals
+- `results.jsonl`: append-only attempts, responses, and cumulative cost inputs
+- `scoring/scoring.csv`: one final scored row per manifest task
+- `scoring/summary.json` and `scoring/paired-transitions.csv`: aggregate and
+  paired evaluation
 
-- Anthropic: https://console.anthropic.com/ → add billing → Settings →
-  API Keys → export as `ANTHROPIC_API_KEY`.
-- OpenAI: https://platform.openai.com/ → add billing →
-  https://platform.openai.com/api-keys → export as `OPENAI_API_KEY`.
-- `scripts/models.yaml`: `claude-fable-5` and `gpt-5.6-sol` (per mentor's
-  guidance) — `run_benchmark.py` skips any model ID starting with
-  `REPLACE_ME` rather than failing.
-- `pip install -r scripts/requirements.txt` before running.
+Preparation refuses an existing run ID. Model, reasoning effort, output cap,
+policy/prompt/schema versions, and pricing are frozen per run. Pairwise
+comparisons are written under `results/tier-a/comparisons/` with metric deltas
+and task-level verdict/category changes.
 
-**Status**: blocked on API budget approval (self-funded, capped at $200
-per mentor's reply — see email thread). Estimated cost ~$1.90 for this
-benchmark (measured from actual file sizes).
+## Stage 6 — Tier A analysis and write-up — done
 
-## Stage 6 — Analyze and write up — not started
+All 60 tasks produced valid structured outputs and were scored. The
+summary reports detection, specificity, abstention/indeterminate counts,
+variant-pair behavior, and per-class metrics. See `results/README.md` and
+the 2026-07-18 entries in `LOG.md` for exact interpretation and caveats.
 
-Compare across models/prompts/bug classes once Stage 5 has run.
+## Stage 7 — Real firmware Tier B ground truth — prepared; automation not built
 
-## Stage 7 — Real firmware proof-of-concept — built, not yet run
+CVE-2016-6277 (Netgear R6400/R7000 command injection) is documented in
+`firmware/CVE-2016-6277-netgear-r6400/info.md`. The repository retains
+selected vulnerable/patched pseudo-code and ground-truth metadata for:
 
-CVE-2016-6277 (Netgear R6400/R7000 command injection). Ground truth
-fully documented (`firmware/CVE-2016-6277-netgear-r6400/info.md`), all
-1004 vulnerable + 1007 patched functions bulk-decompiled, benchmark
-scripts ready:
+- candidate function: `netgear_commonCgi`
+- specific entry point: `parse_http_request`
+- expected path: `parse_http_request` → `handle_get` → `netgear_commonCgi`
 
-```bash
-python3 scripts/run_benchmark_firmware.py CVE-2016-6277-netgear-r6400 \
-    <path>/decompiled/netgear_httpd \
-    <path>/decompiled/netgear_patched_httpd
-python3 scripts/score_firmware.py CVE-2016-6277-netgear-r6400
-```
-
-Scoped to the command-injection prompt only (not the full cross-product —
-~5x the cost for little added value at this scale). See `PIPELINE.md` for
-the reasoning behind the ground-truth/LLM-task split, the binary-selection
-scoping question, and why large-scale replication of the reference
-papers is explicitly out of scope for now.
-
-**Status**: blocked on the same API budget approval as Stage 5.
-Estimated cost ~$50-70 across both models (measured from actual
-decompiled file sizes) — staged spending plan (cheap dry run → one
-model → second model) proposed to the mentor rather than a single blind
-run.
+This material is the initial case for Tier B confirmation, not a runnable
+blind-discovery benchmark. The complete codebase package, Tier B skill,
+prompt, runner, manifest, scoring design, and cost projection still need
+to be created and reviewed. Binary selection and unknown-candidate
+discovery remain out of scope.
 
 ## Stage 8 — Codebase-level vulnerability confirmation (entry-point reachability) — not started
 
@@ -105,7 +97,7 @@ Approved by supervisor 2026-07-17. Two-tier pipeline; the function-level
 tier is confirmed correct as already built:
 
 - **Tier A (function-level, methodology already built = Stage 1-5) —
-  skill built, not yet run for real**: given one function in isolation,
+  complete**: given one function in isolation,
   classify whether it looks vulnerable. The *approach* is confirmed
   correct as-is — the old hand-written scripts were removed and
   regenerated by Codex as a proper skill,
@@ -119,8 +111,11 @@ tier is confirmed correct as already built:
   silent empty results, and — the actual fix for the 2026-07-15
   runaway-spend root cause — LLVM IR inputs now extracted down to just
   the target function instead of whole modules (`CVE-2021-42386`'s
-  patched `.ll`: 1,081,065 → 611 bytes). Dry run only so far, no API
-  calls made, no money spent.
+  patched `.ll`: 1,081,065 → 611 bytes). The real run completed on
+  2026-07-18 with 60/60 valid results; final scoring and the audited cost
+  ledger are in
+  `results/tier-a/runs/2026-07-18__gpt-5-6-sol__mixed-recovered/` (see
+  `LOG.md` for metrics and recovery details).
 - **Tier B (codebase-level, new)**: given the *whole* codebase plus one
   already-flagged candidate function, determine whether that function
   is *actually* vulnerable by tracing reachability from **one specific
@@ -130,6 +125,18 @@ tier is confirmed correct as already built:
   already known (from Tier A, or from ground truth like Stage 6/7's
   `netgear_commonCgi`) and narrows to *confirming* it, not discovering
   an unknown vulnerability from scratch across an entire binary.
+
+Evaluation order is fixed by `EXPERIMENT.md`:
+
+1. Keep Tier A's strict three-way scoring; an `indeterminate` result remains
+   an abstention.
+2. Evaluate Tier B independently using all five known BusyBox candidates and
+   their patched controls (up to 10 cases), with one entry point and a
+   reproducible whole-codebase package per case.
+3. Evaluate the operational cascade separately by forwarding Tier A
+   `vulnerable ∪ indeterminate`, deduplicating compatible candidates, and
+   measuring end-to-end recall, specificity, false-positive survival, and
+   Tier B workload.
 
 ## Stage 9 — Dynamic analysis confirmation — not started
 
@@ -143,12 +150,13 @@ Per supervisor guidance: build Stage 8 using Codex in VS Code (full
 repo context available to the agent), rather than hand-writing
 prompts/scripts the way Stage 1-5 was built.
 
-1. Summarize the skill needed for the function-level task (Tier A) and
-   the skill needed for the codebase-level task (Tier B) — one skill
-   definition per tier.
-2. Let the agent (Codex) generate the actual Python automation —
-   scripts plus result files — from those skill definitions, rather
-   than hand-writing the scripts as in earlier stages.
+1. Treat the completed `classify-function-vulnerabilities/` skill and
+   `results/tier-a/` outputs as the Tier A baseline.
+2. Summarize and review a separate Tier B skill before implementation,
+   fixing the candidate, entry point, permitted whole-codebase context,
+   output schema, evaluation rules, and spending safeguards.
+3. Generate Tier B automation from that reviewed definition, then create
+   a no-API dry-run manifest and cost projection for explicit approval.
 
 Branch: `W2/skills-creation`.
 
@@ -184,12 +192,14 @@ reproduced, or handed off.
 
 ## Immediate next actions
 
-1. Waiting on mentor/Elaine's approval of the API spending plan
-   (~$65-70 estimate, $200 cap) before running Stage 5 or Stage 7 for
-   real.
-2. Still to confirm with mentor: exact OpenAI model ID
-   (`gpt-5.6-sol` assumed correct per his "latest model" guidance, not
-   yet explicitly confirmed).
-3. Once approved: run Stage 5 (cheap, ~$2, do first), then Stage 7's
-   staged plan (small dry run → one model → second model).
-4. Stage 6 (analysis/write-up) once both benchmarks have real results.
+1. Define one specific entry point and reproducible whole-codebase package for
+   each of the five BusyBox Tier B oracle candidates and patched controls.
+2. Define and review the Tier B skill, three-way output schema, and scorer
+   against `EXPERIMENT.md` before implementing automation.
+3. Prepare the complete oracle-candidate manifest without API calls; verify
+   that ground-truth labels, paired diffs, and manual paths are not visible to
+   the model.
+4. Cost and approve the oracle Tier B run before execution. Evaluate the
+   Tier A-selected cascade only after oracle Tier B results are understood.
+5. Assemble the separate Netgear real-firmware Tier B package while keeping
+   manual ground truth outside model-visible context.

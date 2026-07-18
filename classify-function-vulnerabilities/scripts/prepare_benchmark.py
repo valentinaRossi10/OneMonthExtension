@@ -6,9 +6,19 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from experiment_common import (
+    configuration_differences,
+    latest_previous_run,
+    load_metadata,
+    make_run_id,
+    write_metadata,
+)
 
 from tier_a_common import (
     build_prompt,
@@ -26,30 +36,84 @@ from tier_a_common import (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--results-root", type=Path, default=Path("results/tier-a"))
+    parser.add_argument("--run-id")
+    parser.add_argument("--run-label")
+    parser.add_argument(
+        "--experiment-note",
+        action="append",
+        default=[],
+        help="Describe the hypothesis or change; repeat for multiple notes.",
+    )
+    parser.add_argument(
+        "--previous-run",
+        type=Path,
+        help="Run directory to compare configuration against; defaults to latest run.",
+    )
     parser.add_argument("--model", default="gpt-5.6-sol")
-    parser.add_argument("--input-price-per-million", type=float)
-    parser.add_argument("--output-price-per-million", type=float)
+    parser.add_argument("--reasoning-effort", choices=("low", "medium", "high"))
+    parser.add_argument("--input-price-per-million", type=float, required=True)
+    parser.add_argument("--output-price-per-million", type=float, required=True)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
-    output_dir = args.output_dir.resolve()
     policy = load_policy()
     limits = policy["limits"]
+    reasoning_effort = args.reasoning_effort or policy.get("model_settings", {}).get(
+        "reasoning_effort"
+    )
+    if reasoning_effort not in {"low", "medium", "high"}:
+        raise ValueError("A reasoning effort of low, medium, or high is required")
+    results_root = args.results_root.resolve()
+    runs_dir = results_root / "runs"
+    run_id = args.run_id or make_run_id(args.model, reasoning_effort, args.run_label)
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", run_id):
+        raise ValueError(
+            "--run-id must start with a lowercase letter or digit and contain only "
+            "lowercase letters, digits, dots, underscores, and hyphens"
+        )
+    output_dir = runs_dir / run_id
+    if output_dir.exists():
+        raise FileExistsError(
+            f"Run directory already exists and will not be overwritten: {output_dir}"
+        )
 
-    if args.input_price_per_million is not None and args.input_price_per_million < 0:
-        raise ValueError("Input price cannot be negative")
-    if args.output_price_per_million is not None and args.output_price_per_million < 0:
-        raise ValueError("Output price cannot be negative")
+    if args.input_price_per_million <= 0 or args.output_price_per_million <= 0:
+        raise ValueError("Current positive input and output prices are required")
 
     index_path = repo_root / "samples" / "index.csv"
     if not index_path.is_file():
         raise FileNotFoundError(f"Ground-truth index not found: {index_path}")
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    previous_dir = args.previous_run.resolve() if args.previous_run else latest_previous_run(runs_dir)
+    previous_metadata = load_metadata(previous_dir) if previous_dir else None
+    created_at = datetime.now(timezone.utc).isoformat()
+    metadata = {
+        "metadata_version": "tier-a-run-v1",
+        "run_id": run_id,
+        "run_date_utc": created_at[:10],
+        "created_at_utc": created_at,
+        "status": "preparing",
+        "model": args.model,
+        "reasoning_effort": reasoning_effort,
+        "policy_version": policy["policy_version"],
+        "prompt_version": policy["prompt_version"],
+        "schema_version": policy["schema_version"],
+        "max_output_tokens": limits["max_output_tokens"],
+        "hard_budget_ceiling_usd": limits["max_budget_usd"],
+        "input_price_per_million": args.input_price_per_million,
+        "output_price_per_million": args.output_price_per_million,
+        "experiment_notes": args.experiment_note,
+        "previous_run_id": previous_metadata.get("run_id") if previous_metadata else None,
+        "previous_run_path": str(previous_dir) if previous_dir else None,
+    }
+    metadata["differences_from_previous"] = configuration_differences(
+        previous_metadata, metadata
+    )
+    write_metadata(output_dir, metadata)
     inputs_dir = output_dir / "inputs"
     inputs_dir.mkdir(exist_ok=True)
     tasks: list[dict[str, Any]] = []
@@ -149,7 +213,11 @@ def main() -> int:
                     [
                         task_id,
                         args.model,
+                        policy["policy_version"],
                         policy["prompt_version"],
+                        policy["schema_version"],
+                        reasoning_effort,
+                        str(limits["max_output_tokens"]),
                         code_hash or "no-code",
                     ]
                 )
@@ -176,6 +244,7 @@ def main() -> int:
                         "estimated_worst_case_cost_usd": estimated_cost,
                         "model": args.model,
                         "provider": "openai",
+                        "reasoning_effort": reasoning_effort,
                         "policy_version": policy["policy_version"],
                         "prompt_version": policy["prompt_version"],
                         "schema_version": policy["schema_version"],
@@ -194,8 +263,11 @@ def main() -> int:
     known_costs = [task["estimated_worst_case_cost_usd"] for task in ready]
     projected = sum(cost for cost in known_costs if cost is not None)
     summary = {
+        "run_id": run_id,
+        "created_at_utc": created_at,
         "policy_version": policy["policy_version"],
         "model": args.model,
+        "reasoning_effort": reasoning_effort,
         "samples": len(samples),
         "variants": len(input_records),
         "classes": len(policy["classes"]),
@@ -217,6 +289,23 @@ def main() -> int:
     (output_dir / "manifest-summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    metadata["status"] = (
+        "blocked-cost-projection"
+        if projected > limits["max_budget_usd"]
+        else "prepared"
+    )
+    metadata["prepared_at_utc"] = datetime.now(timezone.utc).isoformat()
+    metadata["manifest_summary"] = {
+        key: summary[key]
+        for key in (
+            "tasks",
+            "ready_tasks",
+            "guarded_or_unavailable_tasks",
+            "estimated_worst_case_cost_usd",
+            "pricing_complete",
+        )
+    }
+    write_metadata(output_dir, metadata)
 
     print(json.dumps(summary, indent=2, sort_keys=True))
     print(f"\nManifest: {manifest_path}")
@@ -234,4 +323,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

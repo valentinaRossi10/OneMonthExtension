@@ -61,14 +61,14 @@ def estimate_tokens(text: str, model: str | None = None) -> tuple[int, str]:
     """Return a token estimate; fall back conservatively for punctuation-heavy IR."""
     try:
         import tiktoken  # type: ignore
-
-        try:
-            encoding = tiktoken.encoding_for_model(model or "")
-        except KeyError:
-            encoding = tiktoken.get_encoding("o200k_base")
-        return len(encoding.encode(text)), "tiktoken"
     except ImportError:
         return math.ceil(len(text) / 2), "conservative_chars_div_2"
+
+    try:
+        encoding = tiktoken.encoding_for_model(model or "")
+    except KeyError:
+        return math.ceil(len(text) / 2), "conservative_chars_div_2"
+    return len(encoding.encode(text)), "tiktoken"
 
 
 def estimate_cost_usd(
@@ -288,4 +288,3 @@ def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, sort_keys=True) + "\n")
-

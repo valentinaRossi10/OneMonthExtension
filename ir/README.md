@@ -1,11 +1,11 @@
 # ir/
 
-Generated LLVM IR files, mirroring the structure of `samples/` (and later
-`firmware/` once binary lifting is in use).
+Generated LLVM IR files mirroring the BusyBox samples. LLVM IR is the Tier A
+fallback when a target function has no usable Ghidra pseudo-C variant.
 
 ```
 ir/
-├── busybox-CVE-2022-xxxx/
+├── CVE-2021-42373-busybox/
 │   ├── vulnerable.ll
 │   └── patched.ll
 └── ...
@@ -27,6 +27,6 @@ bear -- make          # produces compile_commands.json
 CC=wllvm make && extract-bc <binary_output>
 ```
 
-## Generating IR from firmware binaries (firmware/, once lifting is set up)
-
-Use RetDec (or McSema/Remill as a fallback) — see `firmware/README.md`.
+The Tier A preparer extracts only the indexed target function before a prompt
+is built; whole LLVM modules are never submitted to the API. The planned
+Tier B representation has not yet been selected.

@@ -9,7 +9,7 @@ One subfolder per sample, e.g.:
 
 ```
 samples/
-├── busybox-CVE-2022-xxxx/
+├── CVE-2021-42373-busybox/
 │   ├── vulnerable/         # source at the vulnerable commit
 │   ├── patched/            # source at the fixing commit (for diffing)
 │   └── info.md             # CVE id, file/function/line, bug class, description
@@ -21,7 +21,10 @@ samples/
 Keep a running index of all samples in `samples/index.csv` with columns:
 `cve_id, project, file, function, line, bug_class, description`
 
-This is the scoring key used in `results/`.
+This is the scoring key used by the Tier A preparer and scorer. Each indexed
+historical class supplies the expected positive only for that sample's
+vulnerable variant and matching class; all variants are still tested against
+the full six-class cross-product.
 
 ## How to add a sample
 
