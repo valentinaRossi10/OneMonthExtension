@@ -64,9 +64,24 @@ $1.889030. Each experiment is stored under
   paired evaluation
 
 Preparation refuses an existing run ID. Model, reasoning effort, output cap,
-policy/prompt/schema versions, and pricing are frozen per run. Pairwise
-comparisons are written under `results/tier-a/comparisons/` with metric deltas
-and task-level verdict/category changes.
+transport mode, SDK retry setting, policy/prompt/schema versions, and pricing
+are frozen per run. Pairwise comparisons are written under
+`results/tier-a/comparisons/` with metric deltas and task-level verdict/category
+changes.
+
+Five 2026-07-20 uniform-high follow-up experiments are preserved separately.
+Policies v4/v5 stopped at 9/27 valid tasks because output
+caps were exhausted. Policy v6 reached 46 valid tasks but had unaudited SDK
+retries and connection errors. Policy v7 background polling reached 26 valid
+tasks, then stopped when one response reported 27,565 output tokens despite a
+4,500-token cap. Policy v8 replaces background polling with synchronous SSE
+streaming and zero SDK retries. Its immutable 60-task run is preserved at
+`results/tier-a/runs/2026-07-20t111012z__gpt-5-6-sol__high__high-4500-usd10-streaming/`;
+all tasks received one attempt, producing 53 valid responses and 7 explicit
+stream-completion errors. Its conservative ledger is $3.374440 under the
+isolated $10 ceiling. The run is scored and compared with the recovered
+baseline, but the failures and simultaneous configuration changes mean it
+does not support a clean reasoning-effort claim.
 
 ## Stage 6 — Tier A analysis and write-up — done
 
@@ -75,7 +90,7 @@ summary reports detection, specificity, abstention/indeterminate counts,
 variant-pair behavior, and per-class metrics. See `results/README.md` and
 the 2026-07-18 entries in `LOG.md` for exact interpretation and caveats.
 
-## Stage 7 — Real firmware Tier B ground truth — prepared; automation not built
+## Stage 7 — Real firmware Tier B ground truth — prepared; package incomplete
 
 CVE-2016-6277 (Netgear R6400/R7000 command injection) is documented in
 `firmware/CVE-2016-6277-netgear-r6400/info.md`. The repository retains
@@ -85,13 +100,13 @@ selected vulnerable/patched pseudo-code and ground-truth metadata for:
 - specific entry point: `parse_http_request`
 - expected path: `parse_http_request` → `handle_get` → `netgear_commonCgi`
 
-This material is the initial case for Tier B confirmation, not a runnable
-blind-discovery benchmark. The complete codebase package, Tier B skill,
-prompt, runner, manifest, scoring design, and cost projection still need
-to be created and reviewed. Binary selection and unknown-candidate
+This material is a future Tier B case, not a runnable blind-discovery
+benchmark. The generic protocol-v6 Tier B skill, runner, and scorer now exist,
+but this Netgear sample still needs a complete analyzed codebase package and
+case-specific costed manifest. Binary selection and unknown-candidate
 discovery remain out of scope.
 
-## Stage 8 — Codebase-level vulnerability confirmation (entry-point reachability) — not started
+## Stage 8 — Recall-first codebase filtering — MVP implemented, evaluation pending
 
 Approved by supervisor 2026-07-17. Two-tier pipeline; the function-level
 tier is confirmed correct as already built:
@@ -138,6 +153,24 @@ Evaluation order is fixed by `EXPERIMENT.md`:
    measuring end-to-end recall, specificity, false-positive survival, and
    Tier B workload.
 
+The protocol-v6 MVP is implemented in
+`confirm-and-filter-vulnerabilities/`. It includes:
+
+- exact-case Tier A ingestion keyed by artifact-scoped function UID and class,
+  with evidence-union coalescing and complete raw-row audit maps;
+- quarantine instead of silent loss for ambiguous or conflicting identity;
+- Ghidra Program Model export of analyzed function identities, direct calls,
+  and explicit unresolved indirect-call sites;
+- hash-verified packages and model tools;
+- proof-gated `retain_confirmed`, `suppress_proven_false_positive`, and
+  `retain_and_escalate` routing;
+- immutable no-API preparation, explicit manifest-bound approval, adaptive
+  but bounded investigation limits, append-only execution, and scoring.
+
+The full P-code/SSA engine, indirect-dispatch resolution, second provider,
+deterministic analyzer, and staffed human-review queue are deferred. No
+protocol-v6 paid execution has occurred.
+
 ## Stage 9 — Dynamic analysis confirmation — not started
 
 Fuzzing pass to confirm Stage 8's findings — closes the loop on the
@@ -158,7 +191,7 @@ prompts/scripts the way Stage 1-5 was built.
 3. Generate Tier B automation from that reviewed definition, then create
    a no-API dry-run manifest and cost projection for explicit approval.
 
-Branch: `W2/skills-creation`.
+Branch: `W3/codebase-level-redesign`.
 
 ## Future possibilities
 
@@ -192,14 +225,12 @@ reproduced, or handed off.
 
 ## Immediate next actions
 
-1. Define one specific entry point and reproducible whole-codebase package for
-   each of the five BusyBox Tier B oracle candidates and patched controls.
-2. Define and review the Tier B skill, three-way output schema, and scorer
-   against `EXPERIMENT.md` before implementing automation.
-3. Prepare the complete oracle-candidate manifest without API calls; verify
-   that ground-truth labels, paired diffs, and manual paths are not visible to
-   the model.
-4. Cost and approve the oracle Tier B run before execution. Evaluate the
-   Tier A-selected cascade only after oracle Tier B results are understood.
-5. Assemble the separate Netgear real-firmware Tier B package while keeping
-   manual ground truth outside model-visible context.
+1. Bind one named frozen Tier A run to artifact-scoped function UIDs and
+   inspect the protocol-v6 ingestion, coalescing, and quarantine audit.
+2. Export and build the real Ghidra-backed packages for the resulting cases.
+3. Prepare a new immutable protocol-v6 run without API calls and report its
+   exact manifest SHA-256 and worst-case cost; the planning envelope is not an
+   execution approval.
+4. Execute only after a separate manifest-bound approval, then report the
+   five-case acceptance cohort separately from the real Tier A cascade.
+5. Build a held-out cohort only as a separately scoped ground-truth project.

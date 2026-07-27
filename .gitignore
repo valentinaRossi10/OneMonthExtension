@@ -11,3 +11,8 @@ firmware/extracted/*
 !firmware/extracted/.gitkeep
 firmware/**/raw/
 firmware/**/extracted/
+
+# BusyBox source clone + build worktrees used to produce Tier B binaries
+# (binaries/tier-b/) — reproducible from the commit hashes recorded in
+# each PROVENANCE.md, not committed themselves.
+dataset/

@@ -1,5 +1,7 @@
 # Experimental protocol
 
+Protocol version: `experiment-protocol-v6`.
+
 This document is the canonical definition of the experiment. `PIPELINE.md`
 explains the design rationale, `PLAN.md` records implementation status, and
 `LOG.md` preserves chronology. If an implementation or result is interpreted
@@ -80,7 +82,11 @@ abstention as a Tier A true positive.
   suspicious index adjustment and subsequent read, but the completed run did
   not locally establish the opaque allocation's readable extent. Its
   `indeterminate` verdict remains a Tier A abstention and is forwarded for
-  contextual confirmation.
+  contextual confirmation. In policy-v8, the same frozen task did not return
+  a completed response and is therefore scored as `api_error`, not as a new
+  verdict. This operational transition from abstention to API error supplies
+  no evidence that high reasoning resolved the underlying ambiguity or would
+  have classified the function differently.
 - **CVE-2021-42386 use-after-free:** the isolated `nvalloc` body contains
   neither the complete free/stale-alias/use sequence nor enough local evidence
   to flag it. This is a designated function-local observability limitation,
@@ -144,17 +150,204 @@ not receive the expected label, CVE description, paired variant/diff, manual
 ground-truth path, or exploitability conclusion. Manual analysis is used only
 to construct and score the case.
 
-### Oracle-candidate matrix
+### Completed single-pair pilot
 
-Evaluate all five known BusyBox candidates independently of Tier A and include
-both vulnerable and patched controls: 5 candidate pairs, up to 10 cases. If a
-fix removes the candidate function, as in the UAF sample, candidate absence is
-an explicit patched outcome rather than an invented replacement function.
+The completed Tier B development pilot is one standalone BusyBox evaluation
+for CVE-2026-29004 only. It contains exactly two cases: the fixed
+candidate and entry point in the vulnerable package, plus the corresponding
+patched control. The exact commits have already been built into complete,
+neutral-ID Tier B packages. No other BusyBox candidate pair is in scope for
+this pilot, and this pilot is not partial progress toward reporting the full
+oracle matrix.
+
+Run
+`2026-07-21t094500z__gpt-5-6-sol__high__busybox-cve-2026-29004-oracle-neutral`
+is retained as a failed pilot diagnostic, not as a successful or representative
+Tier B result. Earlier attempts exposed a harness defect that replayed the
+SDK-only `parsed_arguments` field and received HTTP 400 responses. After that
+defect was bypassed, both cases followed relevant call paths but exhausted the
+seven-tool/eight-model-call per-case budget and ended as `tool_limit`. The
+ledger closed under its USD ceiling, but 0 of 2 cases produced a scorable JSON
+verdict; the run therefore confirmed or rejected nothing. It is evidence that
+the request replay required repair and the per-case call budgets required
+raising.
+
+Run
+`2026-07-21t162742z__gpt-5-6-sol__high__busybox-cve-2026-29004-pilot-v2`
+verified the repaired request replay and raised limits of at most 10 tool calls
+and 11 model calls per case, with the last model call reserved for a
+tool-disabled schema-only conclusion. The patched case produced a valid
+`rejected` verdict. The vulnerable case followed a relevant seven-tool path but
+the provider stopped model call 8 with a cybersecurity content-policy error.
+That run therefore produced 1 of 2 scorable verdicts and is not a complete
+two-case pilot result.
+
+Run
+`2026-07-22t012045z__gpt-5-6-sol__high__busybox-cve-2026-29004-pilot-defensive-v3`
+used `tier-b-prompt-v3`, which states the authorized defensive, static-only
+purpose explicitly and excludes exploit construction, payloads, weaponization,
+execution instructions, and real-world action. It preserved the fixed
+candidate, class, entry point, evidence rules, verdict meanings, output schema,
+and evaluator-information boundary. Both cases produced scorable verdicts: the
+vulnerable case was `confirmed` and the patched control was `rejected`, with no
+abstention or execution failure. The run spent an accounted USD 1.27478 under
+its independently approved USD 10 ceiling. This completed pilot demonstrates
+that the Tier B harness and defensive prompt can complete this one pair; it is
+not a result from, or partial substitute for, the full oracle matrix.
+
+### Separately prepared oracle-candidate follow-on
+
+Five BusyBox candidate pairs were prepared independently of Tier A with both
+vulnerable and patched controls. Preparation made no provider calls. Paid
+execution was subsequently approved and completed for only the four pairs
+other than CVE-2026-29004: 4 candidate pairs, 8 cases, each under its own
+immutable run ID, manifest SHA-256, and USD 10 ceiling. The separately
+prepared CVE-2026-29004 matrix run remains unexecuted; its completed standalone
+pilot remains a separate result and is not folded into this follow-on.
+
+Because `tier-b-policy-v3` caps each run at USD 10 and a complete two-case pair
+can project close to that ceiling, each pair was prepared as an immutable
+two-case run. The approved four runs retain identical model, reasoning, prompt,
+schema, policy, pricing, and limits and are reported together as one four-pair
+oracle-candidate follow-on. They must not be mixed with the earlier standalone
+pilot or described as a completed five-pair matrix.
 
 Running only the five vulnerable cases would measure sensitivity but not
 whether Tier B rejects false confirmations. Patched controls are required for
 specificity. A specific entry point and reproducible whole-codebase package
-must be defined for every case before the matrix is runnable.
+are supplied for every case. The complete packages and evaluator-only case
+records were revalidated while preparing each immutable manifest. Execution,
+scoring, and reporting of the approved four-pair follow-on remain separate from
+the CVE-2026-29004 pilot.
+
+The four completed runs spent an accounted USD 4.713065 in aggregate. The
+integer-overflow pair produced two `indeterminate` verdicts, and the NULL
+pointer dereference pair also produced two `indeterminate` verdicts. For the
+out-of-bounds-read pair, the vulnerable case ended in `api_error` because the
+stream did not deliver a `response.completed` event, while the patched case
+returned `confirmed` and scored as a false positive. For the use-after-free
+pair, the vulnerable case returned `rejected` and scored as a false negative,
+while the patched case returned `rejected` and scored as a true negative.
+Across the eight cases this is four abstentions, one explicit failure, one
+false positive, one false negative, and one true negative, with no correct
+paired transition. These are follow-on results, not full five-pair matrix
+metrics. The versioned cohort report, including per-case diagnostic triage, is
+preserved in
+[`results/tier-b/matrix-summaries/2026-07-23__busybox-four-pair-follow-on__tier-b-v3.md`](results/tier-b/matrix-summaries/2026-07-23__busybox-four-pair-follow-on__tier-b-v3.md).
+
+### Completed protocol-v4 evaluator-remediation runs
+
+Protocol v4 preserves every historical v3 run and introduces a separately
+controlled remediation evaluation. It uses `tier-b-prompt-v4`,
+`tier-b-policy-v4`, and neutral `tier-b-package-v2` indexes. Package v2 adds
+mechanically extracted indirect-call, address/data-reference, declaration,
+string, and memory-operation facts. These facts contain no CVE identity,
+variant role, expected verdict, pair diff, manual path, or exploitability
+conclusion. Prompt v4 directs candidate-first analysis and defines
+class-neutral necessary conditions, including logical release/reuse as a
+possible object-lifetime end.
+
+The remediation scope is limited to:
+
+- CVE-2017-15873 vulnerable only, using verified closer entry
+  `FUN_00113194`; its patched artifact is excluded because it is not a clean
+  negative for the broad integer-overflow class.
+- CVE-2021-42373 vulnerable and patched, retaining entry/candidate
+  `FUN_00105d3e`; this is the only complete remediation pair.
+- CVE-2021-42386 vulnerable only, using verified closer entry
+  `FUN_001150ce`; its already-correct patched rejection is not rerun.
+
+CVE-2021-42374 is not repackaged under v4. Its vulnerable transport-error case
+remains eligible only for an explicitly approved append-only retry under the
+original v3 manifest and remaining ceiling. Its patched control remains
+audit-pending and is excluded. Consequently, the three remediation runs must
+be reported as one vulnerable-only integer-overflow case, one complete NULL
+pointer pair, and one vulnerable-only use-after-free case—not as a complete
+four-pair or five-pair matrix.
+
+The four remediation cases completed with three `indeterminate` abstentions
+and one stream `api_error`; no case produced a correct decisive verdict.
+Aggregate accounted spend was $3.070945 under the approved $30 aggregate
+ceiling. The preserved report is
+[`results/tier-b/matrix-summaries/2026-07-23__busybox-remediation-subset__tier-b-v4.md`](results/tier-b/matrix-summaries/2026-07-23__busybox-remediation-subset__tier-b-v4.md).
+
+### Protocol-v5 targeted corrections
+
+Protocol v5 versions two different corrections without treating them as one
+undifferentiated rerun. `tier-b-prompt-v5` keeps the 10-tool/11-model-call
+limits and package v2 for the CVE-2021-42373 pair, but requires sequence-based
+NULL analysis to test the shortest feasible non-null prefix and the exact
+pointer/index advance. `tier-b-policy-v6` uses package v3 and
+12-tool/13-model-call limits for the vulnerable-only CVE-2021-42386 case.
+Package v3 adds mechanically derived `call_result_alias_reuse` facts that
+report a call result's assignment and later syntactic reuse without claiming
+object identity, deallocation, stale lifetime, or vulnerability.
+
+The CVE-2017-15873 infrastructure failure is not changed or repackaged. It
+remains eligible only for an explicitly approved append-only retry of the
+exact v4 case under its original manifest and cumulative $10 ceiling.
+
+The approved targeted follow-up completed as follows. The unchanged
+CVE-2017-15873 retry reproduced the missing-`response.completed` API error.
+For CVE-2021-42373, prompt v5 produced a true positive on the vulnerable case
+and a false positive on the patched case. The package-v3 CVE-2021-42386
+vulnerable case returned `rejected` and remained a false negative. Additional
+spend for these actions was $3.222740; current cumulative spend across their
+three ledgers is $4.385025. The separate report is
+[`results/tier-b/matrix-summaries/2026-07-23__busybox-targeted-follow-up__tier-b-v5.md`](results/tier-b/matrix-summaries/2026-07-23__busybox-targeted-follow-up__tier-b-v5.md).
+
+### Protocol-v6 recall-first filtering MVP
+
+Protocol v6 is a redesign, not an incremental rerun of v4 or v5. Historical
+fixed-candidate runs remain immutable. The new operational unit is the actual
+Tier A queue, and the safety priority is to avoid silently discarding a
+forwarded true positive.
+
+Queue ingestion uses the exact logical key
+`(artifact-scoped function UID, normalized target class)`. It never
+deduplicates by function UID alone or by address. Exact duplicates from
+multiple Tier A prompts, attempts, or runs may be coalesced only after their
+artifact identity agrees; the case preserves the union of source evidence and
+reasoning and records how many raw rows were coalesced. Missing, ambiguous, or
+conflicting bindings are quarantined and retained for escalation rather than
+dropped.
+
+The MVP analysis package replaces regex-only call-edge discovery with
+mechanical facts from Ghidra's Program Model: analyzed function identities and
+content hashes, direct call references, and explicit unresolved indirect-call
+sites. It does not claim SSA, dominators, def-use slicing, symbolic range
+proofs, indirect-dispatch resolution, or cross-binary function matching.
+Those are deferred capabilities with their own future correctness burden.
+
+The three operational dispositions are:
+
+- `retain_confirmed` when the class and contextual path obligations are
+  evidenced;
+- `suppress_proven_false_positive` only when the complete rejection gate is
+  satisfied and no material identity or unresolved-indirect-call uncertainty
+  remains; and
+- `retain_and_escalate` for every unresolved, refused, failed, ambiguous, or
+  resource-exhausted case.
+
+The MVP has no configured second model/provider, deterministic vulnerability
+analyzer, or staffed human-review service. When additional escalation
+facilities are unavailable, `retain_and_escalate` is the terminal state for
+this pass.
+
+Each case starts with at most 12 tool calls and 13 model calls. An adaptive
+extension of at most four tool calls and four model calls may be granted only
+after mechanically recorded investigation progress, for absolute limits of
+16 and 17. Before any paid execution, real packages and prompts must be frozen
+and the exact worst-case projection recomputed. The planning envelope at the
+frozen reference rates is approximately USD 9.86 per case, USD 49.30 for the
+five-positive acceptance set, or USD 98.60 for ten cases; these are design
+ceilings, not approval or actual spend.
+
+The only current positive acceptance set is the five reviewed BusyBox CVEs.
+A target of 5/5 confirmations with zero true-positive suppressions applies
+only to this known set. Meeting it would not establish universal recall,
+generalization to unseen CVEs, or held-out performance. No held-out cohort is
+available; constructing one is a separate ground-truth project.
 
 The Netgear CVE-2016-6277 case is an additional real-firmware Tier B case with
 candidate `netgear_commonCgi`, entry point `parse_http_request`, and expected
@@ -163,11 +356,15 @@ the complete codebase package and Tier B automation are not yet present.
 
 ### Tier B metrics
 
-Define a structured three-way result—confirmed, rejected, or indeterminate—
-before implementation. Report vulnerable-case sensitivity, patched-case
-specificity, precision, abstentions, failures, per-class outcomes, and paired
-vulnerable-to-patched transitions. Preserve the evidence path and unresolved
-assumptions for manual audit.
+Use the structured three-way result—confirmed, rejected, or indeterminate.
+For the two-case CVE-2026-29004 pilot, report both case outcomes and failures
+directly; do not present two cases as matrix-level sensitivity, specificity, or
+precision. For the separately approved four-pair follow-on, report
+vulnerable-case sensitivity, patched-case specificity, precision, abstentions,
+failures, per-class outcomes, and paired vulnerable-to-patched transitions
+over its eight cases only. Preserve the evidence path and unresolved
+assumptions for manual audit. Do not combine the pilot and follow-on into a
+nominal five-pair matrix score.
 
 ## End-to-end cascade experiment
 
@@ -188,11 +385,11 @@ the practical combined pipeline and exposes Tier A misses.
 
 ## Experimental controls and run comparisons
 
-Every paid Tier A experiment uses a new immutable
-`results/tier-a/runs/<run-id>/` directory with a README and
-`run-metadata.json`. Model, reasoning effort, output cap, prompt/schema/policy
-versions, pricing, and task/input hashes are frozen per run. Preparation
-refuses an existing run ID.
+Every paid Tier A or Tier B experiment uses a new immutable run directory with
+a README and `run-metadata.json`. Model, reasoning effort, output cap,
+prompt/schema/policy/experiment versions, pricing, and task/input hashes are
+frozen per run. Tier B approval additionally names the manifest SHA-256.
+Preparation refuses an existing run ID.
 
 Change one experimental factor at a time when making causal comparisons. In
 particular, low/medium/high reasoning experiments must use the same model,
@@ -202,19 +399,39 @@ it is a historical baseline, not a clean reasoning-effort control.
 
 Before paid execution, prepare the complete manifest without API calls,
 validate guards and pricing, show the worst-case cost, obtain explicit
-approval, and enforce a hard per-run ceiling no greater than USD 5 before each
-request. Retries remain in the same run ledger and ceiling. A new experiment
-requires its own reviewed projection and approval.
+approval, and enforce a hard per-run ceiling no greater than the active
+versioned policy limit before each request (USD 10 in `tier-a-policy-v8` and
+USD 10 in the active Tier B policies; historical Tier B runs retain their
+frozen policy). Tier B approval must name both the run ID and
+manifest SHA-256. Retries remain in the same run ledger and ceiling. A new
+experiment requires its own reviewed projection and approval.
 
 ## Reporting boundaries
 
-The current repository supports and contains one completed Tier A run. It does
-not yet contain a runnable Tier B benchmark or dynamic-analysis stage.
+The current repository supports Tier B automation, preserves the two failed
+CVE-2026-29004 diagnostic runs, and contains the completed defensive-v3
+single-pair pilot described above. Five separate pair runs were prepared, but
+provider execution was completed only for the four pairs other than
+CVE-2026-29004. The repository therefore contains a completed four-pair
+follow-on but not a completed five-pair oracle matrix, end-to-end cascade
+result, or dynamic-analysis stage. Protocol v4 additionally supports the
+separately controlled evaluator-remediation subset described above.
 Accordingly:
 
 - do not describe Tier A positives as confirmed exploitable vulnerabilities;
 - do not describe oracle candidates as discoveries by the model;
-- do not claim Tier B or end-to-end cascade performance before those
-  experiments exist; and
+- do not describe the zero-verdict diagnostic as confirming either case, and
+  do not translate the newer run's vulnerable-case API failure into a verdict
+  or present its single patched verdict as representative Tier B performance;
+- do not present the completed defensive-v3 single-pair pilot as full-matrix
+  performance or reuse it as one of the five separately controlled matrix
+  pairs;
+- do not present the approved four-pair follow-on, alone or combined with the
+  historical pilot, as a completed five-pair matrix;
+- do not present the protocol-v4 remediation subset or protocol-v5 targeted
+  corrections as a complete oracle
+  matrix or combine its results with immutable v3 metrics;
+- do not claim full-matrix Tier B or end-to-end cascade performance before
+  those separately approved experiments exist; and
 - keep historical results immutable when methodology changes—version the
   protocol/prompt and create a new run instead.

@@ -104,6 +104,12 @@ directory, frozen model/reasoning configuration, and a README describing
 how it differs from the preceding experiment; scored runs can be compared
 at both metric and task level without further API calls.
 
+The active policy-v8 transport uses synchronous server-sent-event streaming
+with SDK retries disabled. Transport mode and retry policy are frozen in the
+manifest/cache identity. This replaces policy-v7 background polling after a
+background response reported and billed 27,565 output tokens despite a
+4,500-token request cap; the runner now also stops on any such usage breach.
+
 The Codex-generated Tier A benchmark was run end-to-end on 2026-07-18:
 60/60 tasks returned valid structured results and were scored. See
 `results/tier-a/` and the corresponding `LOG.md` entry for metrics, cost,
@@ -165,7 +171,7 @@ does not retain a complete 2,011-function corpus or a Tier B prompt,
 runner, manifest, or results. Those must be designed and costed before a
 Tier B execution can be claimed.
 
-## Stage 8 — Codebase-level vulnerability confirmation (planned, not started)
+## Stage 8 — Codebase-level vulnerability confirmation (MVP implemented)
 
 An earlier draft of this stage (explored 2026-07-15/16, since discarded)
 proposed letting the model search an entire binary from scratch,
@@ -209,11 +215,21 @@ exploitable bug versus dead code or an unreachable branch. Tier B
 targets exactly that gap, using the whole codebase as context rather
 than one isolated function.
 
-**Working method**: Tier A has been implemented and run from its reviewed
-skill definition. For Tier B, first review a separate skill definition
-that fixes the candidate, entry point, allowed context, output schema,
-evaluation rules, and spending safeguards; only then generate automation
-and prepare a dry-run manifest for approval.
+**Working method**: The historical fixed-candidate oracle protocol and runs
+remain under `confirm-vulnerability-reachability/` and `results/tier-b/`.
+The protocol-v6 redesign is a separate recall-first filter implemented in
+`confirm-and-filter-vulnerabilities/`. It consumes frozen Tier A rows,
+coalesces only exact `(artifact-scoped function UID, target class)` duplicate
+cases while preserving all provenance, and routes every ambiguous row to
+`retain_and_escalate`.
+
+The MVP package is intentionally narrower than a general static-analysis
+engine. A Ghidra Program Model export supplies content-bound function
+identities, analyzed direct calls, and explicit unresolved indirect-call
+sites. Suppression requires a complete rejection proof and is blocked by
+material identity or unresolved-dispatch uncertainty. SSA, dominators,
+def-use slices, indirect-target resolution, a second provider, deterministic
+analyzer fallback, and staffed human review are deferred.
 
 The complete normative protocol, including model-visible information and
 what may be claimed from each evaluation, is in `EXPERIMENT.md`.
@@ -222,16 +238,16 @@ what may be claimed from each evaluation, is in `EXPERIMENT.md`.
 findings, closing the loop on the project's original hybrid
 static + dynamic framing.
 
-Exploration branch: `W2/skills-creation`.
+Implementation branch: `W3/codebase-level-redesign`.
 
 ## Current status
 
-The BusyBox Tier A calibration is complete: all 60 cross-product tasks
-were executed and scored under the $5 ceiling, with a $1.889030
-conservative local cost ledger. Netgear CVE-2016-6277 has documented
-ground truth and selected decompiled functions, but Tier B automation and
-a complete codebase input package have not yet been built. Dynamic
-confirmation is also not started.
+The BusyBox Tier A calibration and historical Tier B protocol-v3/v4/v5 runs
+are complete and preserved. The protocol-v6 recall-first Tier B MVP,
+schemas, runner, scorer, and Ghidra exporter are implemented and locally
+validated, but no real protocol-v6 queue, approval manifest, or paid run has
+been prepared. Netgear CVE-2016-6277 still lacks a complete package. Dynamic
+confirmation is not started.
 
 ## Repo structure
 

@@ -5,6 +5,9 @@ The current function-level benchmark is Tier A.
 Interpret all results under the canonical rules in
 [`EXPERIMENT.md`](../EXPERIMENT.md).
 
+For a concise view of progress across Tier A, Tier B, and the remaining
+pipeline stages, see [`OVERALL_RESULTS.md`](OVERALL_RESULTS.md).
+
 ## Tier A experiment layout
 
 ```text
@@ -101,6 +104,25 @@ as a Tier A true positive. These figures describe this mixed-configuration run
 only. See [`EXPERIMENT.md`](../EXPERIMENT.md) for oracle Tier B and cascade
 evaluation rules.
 
+### Recall-first Tier B redesign artifacts
+
+The protocol-v6 implementation lives in
+[`confirm-and-filter-vulnerabilities/`](../confirm-and-filter-vulnerabilities/SKILL.md).
+Its ingestion output records the raw-to-case mapping explicitly:
+
+```text
+<queue-output>/
+├── queue.jsonl             # one case per exact function UID + class
+├── dedup-map.jsonl         # all source rows and evidence merged per case
+├── quarantine.jsonl        # ambiguous/conflicting rows retained for escalation
+├── raw-row-map.jsonl       # evaluator audit map for every eligible Tier A row
+└── ingestion-summary.json  # raw, coalesced, and quarantined counts
+```
+
+Historical `results/tier-b/runs/` and matrix summaries remain immutable and
+must not be combined with a future protocol-v6 cohort. No paid protocol-v6 run
+has been prepared or executed yet.
+
 ## Other per-run files
 
 - `manifest.jsonl` records task metadata, expected labels, normalized-code
@@ -139,7 +161,7 @@ python3 classify-function-vulnerabilities/scripts/run_benchmark.py \
   --run-dir results/tier-a/runs/<run-id> \
   --input-price-per-million <current-price> \
   --output-price-per-million <current-price> \
-  --budget-usd 5
+  --budget-usd 10
 
 # Add --execute only after reviewing the dry-run cost projection.
 
@@ -148,9 +170,11 @@ python3 classify-function-vulnerabilities/scripts/score_benchmark.py \
 ```
 
 The runner requires the explicit `--execute` flag before making paid API calls
-and enforces the configured cumulative spending ceiling. A changed reasoning
-setting must be prepared as a new run; it cannot be applied retrospectively to
-an existing manifest.
+and enforces the configured cumulative spending ceiling. The active policy
+freezes synchronous SSE streaming and zero SDK retries in each manifest and
+stops if reported usage exceeds the output-token cap. A changed reasoning or
+transport setting must be prepared as a new run; it cannot be applied
+retrospectively to an existing manifest.
 
 ## Comparing experiments
 

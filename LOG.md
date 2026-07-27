@@ -649,3 +649,149 @@ summaries (function-level, codebase-level) to hand to Codex.
   and exploitability conclusions remain hidden from the model. Tier B and
   cascade performance must not be claimed until their automation and runs
   actually exist.
+
+## 2026-07-20 — Uniform-high Tier A attempts; policy v5 budget/output revision
+
+- Prepared a uniform `high` reasoning run at the existing 1,900-token cap
+  under `tier-a-policy-v4`. Its 60-task worst-case projection was $4.819600
+  under the $5 ceiling. Execution stopped after 9 valid tasks when
+  `CVE-2026-29004__patched__integer-overflow` twice consumed the full output
+  cap without returning JSON. The partial run was scored with 1 invalid and
+  50 missing tasks; its conservative cumulative ledger is $0.428205.
+- After explicit approval, versioned the active controls as
+  `tier-a-policy-v5`: 3,000 maximum output tokens and an $8 hard cumulative
+  ceiling. The new immutable 60-task manifest projected $6.799600 worst case
+  and passed both representation preflights.
+- The 3,000-token run resolved the task that failed under v4, but later
+  `CVE-2017-15873__vulnerable__integer-overflow` and
+  `CVE-2017-15873__vulnerable__out-of-bounds-read` each consumed all 3,000
+  output tokens without JSON. The integer-overflow reviewed retry encountered
+  two conservatively reserved connection errors and then repeated the invalid
+  output; execution stopped without further retries.
+- Policy-v5 final ledger: 32 append-only attempts, 27 tasks with valid latest
+  results, 2 terminal invalid tasks, 31 missing tasks, and $1.407280 cumulative
+  recorded/committed cost under the $8 ceiling. Strict scoring yielded TP=1,
+  FN=1, TN=15, FP=7, abstentions=3, decision coverage 40%, and strict accuracy
+  26.67%. These are partial-run bookkeeping metrics, not a complete estimate
+  of high-reasoning performance.
+- Generated comparisons against both
+  `2026-07-18__gpt-5-6-sol__mixed-recovered` and the partial v4 uniform-high
+  run. Because the candidate is incomplete and changes policy/output cap as
+  well as reasoning relative to the recovered baseline, no causal reasoning-
+  effort claim is supported.
+
+## 2026-07-20 — Policy-v8 synchronous-streaming Tier A run prepared
+
+- Preserved the partial policy-v6 and policy-v7 experiments. Policy v6 reached
+  46 valid tasks but hidden SDK retries made request exposure unauditable.
+  Policy v7 background mode reached 26 valid tasks before response
+  `resp_0cc44442c378c20b006a5df762251c819bbc67822df72b270f` reported 5,190
+  input and 27,565 output tokens for a request whose frozen output cap was
+  4,500. The provider dashboard independently showed the same token counts.
+- Versioned the active controls as `tier-a-policy-v8`: synchronous SSE
+  streaming, `max_retries=0`, high reasoning effort, a 4,500-token output cap,
+  and an isolated hard $10 ceiling. The runner now stops if provider-reported
+  usage itself exceeds the frozen output cap, in addition to its existing
+  cumulative pre-request budget checks.
+- Prepared the new immutable run
+  `2026-07-20t111012z__gpt-5-6-sol__high__high-4500-usd10-streaming` without
+  making API calls. All 60 tasks are ready and preserve the policy-v7 prompt
+  and code hashes. At $5 per million input tokens and $30 per million output
+  tokens, its 279,920 projected input tokens cost at most $1.399600 and its
+  270,000 reserved output tokens cost at most $8.100000: $9.499600 total,
+  leaving $0.500400 below the separate $10 ceiling.
+- The no-API runner dry run and a local fake-stream test passed. The fake test
+  also confirmed that a 4,501-token provider usage record is classified as a
+  budget breach. No `results.jsonl` exists for v8 and its recorded spend is
+  $0. Execution remains pending explicit approval of this exact manifest and
+  projection.
+
+## 2026-07-20 — Policy-v8 executed, scored, and compared
+
+- After explicit approval, executed all 60 frozen v8 tasks exactly once with
+  synchronous SSE streaming and SDK retries disabled. Fifty-three responses
+  completed with valid structured output. Seven streams ended without a
+  `response.completed` event and were recorded as `api_error`; none was
+  retried. The affected tasks were the vulnerable integer-overflow and both
+  out-of-bounds-read checks for CVE-2017-15873, plus both integer-overflow and
+  both out-of-bounds-read checks for CVE-2021-42374.
+- Completed responses used 159,937 input tokens and 46,133 output tokens for
+  $2.183675 at the frozen rates. The largest completed output was 3,789 tokens,
+  so no completed response breached the 4,500-token cap. Reserving each failed
+  stream at its full per-task worst case gives the conservative cumulative
+  ledger of $3.374440, $6.625560 below the isolated $10 ceiling.
+- Strict 60-task scoring: TP=2, FN=1, TN=31, FP=11, abstentions=8, API errors=7;
+  decision coverage 75%, recall 40%, observable-positive recall 50%, precision
+  15.38%, specificity 56.36%, balanced accuracy 48.18%, strict accuracy 55%,
+  and F1 22.22%. The two true positives were heap-buffer-overflow and
+  null-pointer-dereference. The indexed integer-overflow and out-of-bounds-read
+  positives were API errors; the designated cross-function UAF remained the
+  one false negative.
+- Compared with `2026-07-18__gpt-5-6-sol__mixed-recovered`: recall changed
+  60% to 40%, observable-positive recall 75% to 50%, specificity 63.64% to
+  56.36%, strict accuracy 63.33% to 55%, F1 31.58% to 22.22%, and recorded
+  conservative cost $1.889030 to $3.374440. The false-positive count remained
+  11. Fourteen task categories/verdicts changed. This is not a clean causal
+  reasoning-effort comparison because reasoning, policy, output cap, transport,
+  and budget changed, and v8 contains seven API failures.
+
+## 2026-07-20 — Interpreting the indexed out-of-bounds-read API error
+
+- For `CVE-2021-42374__vulnerable__out-of-bounds-read`, the recovered baseline
+  returned `indeterminate` at low reasoning after using 1,832 of its 1,900
+  output tokens. Its explanation identified the unrechecked adjusted index and
+  subsequent read, but could not prove the readable extent of the allocation
+  made by an opaque callee or fully resolve the decoder-state constraints.
+- The same prompt and code hash did not yield a verdict at high reasoning.
+  Policy-v6 recorded two connection errors on this exact task, subject to that
+  run's SDK-retry audit caveat. Policy-v8, with synchronous streaming and SDK
+  retries disabled, ended without a `response.completed` event and recorded
+  one `api_error`. The v8 record contains no text, usage, or provider response
+  ID from which a verdict can be reconstructed.
+- **Working hypothesis:** this task lies near Tier A's function-local evidence
+  boundary. It presents a plausible local read-after-index-adjustment pattern,
+  while the rubric correctly requires an inferable object extent and feasible
+  path. High reasoning may spend substantially more computation trying to
+  reconcile those competing signals and reach the output limit or fail during
+  structured-response finalization before emitting JSON. The baseline's
+  1,832/1,900 output usage and repeated high-reasoning failures are consistent
+  with this hypothesis, but do not prove it; a transport or provider failure
+  remains an alternative explanation.
+- Consequently, the comparison's `abstention -> api_error` transition is an
+  operational reliability regression, not evidence of a semantic change from
+  `indeterminate` to either `vulnerable` or `not_vulnerable`. A future test
+  should first preserve incomplete-stream event details and usage, then run
+  this exact frozen task under controlled reasoning/cap settings with a new
+  cost projection and explicit retry approval.
+
+## 2026-07-23 — Protocol-v6 recall-first Tier B MVP implemented
+
+- Reconciled the workspace to the already checked-out
+  `W3/codebase-level-redesign` branch at base commit `7e16ff0`; no remote
+  branch or fetch was required. Existing historical Tier A/Tier B files and
+  runs remain uncommitted and preserved.
+- Added `confirm-and-filter-vulnerabilities/` as a separate Tier B redesign,
+  leaving `confirm-vulnerability-reachability/` and all historical runs
+  unchanged. The redesign treats Tier B as a recall-first filter over real
+  Tier A output and never converts failures or uncertainty into suppression.
+- Fixed queue identity at `(artifact-scoped function UID, normalized target
+  class)`. Exact duplicates retain the union of evidence and full source-row
+  provenance; different classes never merge. Every eligible raw row maps to
+  one case or an explicit quarantine record.
+- Replaced regex call-edge inference in the new package format with a Ghidra
+  Program Model exporter for function content hashes, direct call references,
+  and explicit unresolved indirect-call sites. A real read-only headless
+  validation against the CVE-2017-15873 BusyBox binary exported 647 functions,
+  1,978 direct calls, and 15 unresolved indirect calls.
+- Added proof-gated dispositions, hash-verified package access, immutable
+  no-API preparation, manifest-bound execution approval, append-only ledgers,
+  adaptive 12+4 tool and 13+4 model-call limits, and evaluator scoring.
+- Kept SSA/dominator/def-use analysis, indirect-target resolution, a second
+  provider, deterministic analyzer fallback, and staffed human review out of
+  the MVP. `retain_and_escalate` is terminal when those facilities are
+  unavailable.
+- Documented that the five known BusyBox positives are an acceptance set, not
+  a held-out cohort. A 5/5 result would not establish universal recall.
+  Planning cost is approximately $9.86 per case, $49.30 for five positives, or
+  $98.60 for ten cases; exact cost must be recomputed from frozen real
+  packages before any approval. No provider API calls were made.

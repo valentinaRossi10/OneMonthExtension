@@ -13,13 +13,16 @@ for chronological history.
 - **Tier A — function-level classification: complete.** A model receives one
   isolated Ghidra pseudo-C function (or function-only LLVM IR fallback) and
   classifies one requested vulnerability class. The BusyBox benchmark runs the
-  full 5 samples x 2 variants x 6 classes cross-product. All 60 tasks were run
-  and scored under a hard cumulative $5 ceiling.
-- **Tier B — codebase-level confirmation: not built yet.** Given a candidate
-  plus the whole codebase and one specific entry point, confirm whether it is
-  reachable and genuinely vulnerable. First evaluate Tier B independently on
-  all known vulnerable/patched candidate pairs; only then evaluate the
-  operational Tier A → Tier B cascade. This is not blind discovery.
+  full 5 samples x 2 variants x 6 classes cross-product. The recovered baseline
+  completed and scored all 60 tasks under a hard cumulative $5 ceiling. Later
+  uniform-high experiments are preserved separately as stopped partial runs.
+- **Tier B — historical oracle confirmation plus recall-first redesign.**
+  Historical protocol-v3/v4/v5 runs are preserved under `results/tier-b/`.
+  The new `confirm-and-filter-vulnerabilities/` MVP ingests real Tier A output,
+  coalesces only exact artifact-scoped function/class duplicates, packages
+  Ghidra program-model call facts, and suppresses a case only after a complete
+  rejection proof. All unresolved or failed cases remain retained for
+  escalation. No redesign run has been executed yet.
 - **Static handoff rule:** Tier A remains strictly scored, but both
   `vulnerable` and `indeterminate` cases advance to Tier B. Forwarding an
   abstention does not retroactively count it as a Tier A positive.
@@ -36,6 +39,8 @@ discovery benchmark.
 |---|---|
 | [`EXPERIMENT.md`](EXPERIMENT.md) | Canonical research questions, labels, handoff policy, evaluation matrices, metrics, and reporting boundaries |
 | [`classify-function-vulnerabilities/`](classify-function-vulnerabilities/SKILL.md) | Canonical Tier A skill, rubrics, schema, policy, and automation |
+| [`confirm-and-filter-vulnerabilities/`](confirm-and-filter-vulnerabilities/SKILL.md) | Recall-first Tier B MVP for real Tier A queue ingestion, Ghidra-backed packages, proof-gated filtering, execution, and scoring |
+| [`confirm-vulnerability-reachability/`](confirm-vulnerability-reachability/SKILL.md) | Historical fixed-candidate Tier B oracle protocol and preserved run tooling |
 | [`samples/`](samples/README.md) | Verified vulnerable/patched BusyBox source ground truth |
 | [`binaries/`](binaries/README.md) | Linked and stripped BusyBox binaries used for decompilation |
 | [`pseudo-code/`](pseudo-code/README.md) | Primary Ghidra pseudo-C function inputs |
@@ -52,7 +57,7 @@ The skill is exposed to Codex through
 
 ```text
 Use $classify-function-vulnerabilities to prepare, run, and score Tier A.
-First show the dry-run projection, enforce a hard cumulative $5 per-run ceiling,
+First show the dry-run projection, enforce the active versioned per-run ceiling,
 wait for approval before paid API calls, and create a new named run rather
 than reusing results from an earlier model or reasoning configuration.
 ```
@@ -61,10 +66,25 @@ For direct commands and result schemas, see
 [`results/README.md`](results/README.md) and the skill's
 [`SKILL.md`](classify-function-vulnerabilities/SKILL.md).
 
+## Recall-first Tier B quick start
+
+The redesign skill is exposed through
+`.codex/skills/confirm-and-filter-vulnerabilities`. Invoke it with:
+
+```text
+Use $confirm-and-filter-vulnerabilities to ingest the named frozen Tier A
+run, build hash-verified Ghidra packages, and prepare—but do not execute—a
+recall-first Tier B run. Report quarantine and exact-duplicate coalescing,
+the immutable manifest SHA-256, and the exact worst-case cost.
+```
+
+Preparation makes no provider calls. Execution requires a separate approval
+that names the run ID, manifest SHA-256, and spending ceiling.
+
 ## Requirements
 
 - Linux, Python 3, `clang`/LLVM, `git`, and Ghidra
-- `OPENAI_API_KEY` only for paid Tier A execution
+- `OPENAI_API_KEY` only for separately approved paid Tier A or Tier B execution
 - Python dependencies from
   `classify-function-vulnerabilities/scripts/requirements.txt`
 
