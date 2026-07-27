@@ -1,0 +1,12 @@
+{
+  "call_edges_index": "call-edges.jsonl",
+  "corpus_root": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/binaries/tier-b/CVE-2021-42374-busybox/decompiled/vulnerable",
+  "corpus_sha256": "a97114a17c83776b0dcdb1355cc9e6f84f3e251d9e399734ce54d779a9f01e7f",
+  "created_at_utc": "2026-07-23T02:03:13.735099+00:00",
+  "edge_count": 893,
+  "function_count": 377,
+  "functions_index": "functions.jsonl",
+  "package_id": "busybox-oracle-g",
+  "package_version": "tier-b-package-v1",
+  "total_chars": 450472
+}

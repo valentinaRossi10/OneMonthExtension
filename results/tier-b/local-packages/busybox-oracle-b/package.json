@@ -1,0 +1,12 @@
+{
+  "call_edges_index": "call-edges.jsonl",
+  "corpus_root": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/binaries/tier-b/CVE-2026-29004-busybox/decompiled/patched",
+  "corpus_sha256": "75cbf8abe74b841989162406de69e683023c19e8868c15b842844d71f5b9657a",
+  "created_at_utc": "2026-07-21T09:43:20.614982+00:00",
+  "edge_count": 966,
+  "function_count": 397,
+  "functions_index": "functions.jsonl",
+  "package_id": "busybox-oracle-b",
+  "package_version": "tier-b-package-v1",
+  "total_chars": 478763
+}

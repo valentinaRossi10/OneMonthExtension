@@ -1,0 +1,15 @@
+{
+  "call_edges_index": "call-edges.jsonl",
+  "corpus_root": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/binaries/tier-b/CVE-2021-42373-busybox/decompiled/vulnerable",
+  "corpus_sha256": "8a5a1458b5224f3a7ae5959bfacaec7eb99c19f5a49ceced025a28033e50f265",
+  "created_at_utc": "2026-07-23T04:30:00.594594+00:00",
+  "edge_count": 887,
+  "function_count": 376,
+  "functions_index": "functions.jsonl",
+  "package_id": "busybox-remediation-b",
+  "package_version": "tier-b-package-v2",
+  "semantic_fact_count": 3180,
+  "semantic_facts_index": "semantic-facts.jsonl",
+  "semantic_facts_sha256": "06d009b1e1b3f3a9dde1b9d3fd73d0c280b9c4e29d21d480ea7ab4bd2f2309b5",
+  "total_chars": 442596
+}
