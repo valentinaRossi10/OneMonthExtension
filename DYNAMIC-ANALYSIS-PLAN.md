@@ -42,6 +42,36 @@ from the Tier B binary corpus work. Original AFL is not used — it is
 unmaintained; AFL++ is its actively developed successor and the standard
 default for this class of target.
 
+AFLNet was considered given the IoT-firmware angle, and re-examined
+specifically for the CVE-2026-29004 case (a network client, not
+server). Rejected for all 5 cases: AFLNet's actual value is stateful,
+multi-message protocol-session exploration, and none of the 5 CVEs need
+that — each is reachable from a single process invocation with one
+fuzzed input (a byte buffer or argv), verified per-case below by
+reading the real candidate/entry-point linkage before committing to
+this. Bringing in AFLNet's server/response-code-state machinery would
+add real integration cost for zero corresponding benefit here.
+
+### 1a. Per-case harness feasibility (verified against real source)
+
+| CVE | Candidate linkage | Workaround needed | Status |
+|---|---|---|---|
+| CVE-2026-29004 (udhcpc6) | `fill_envp`/`option_to_env` are `static` | Small patch — harness appended to the same translation unit, so `static` never actually needs to change | **Built, crash-repro verified** — `dynamic-analysis/cve-2026-29004/` |
+| CVE-2017-15873 (bunzip2) | `start_bunzip`/`read_bunzip`/`unpack_bz2_stream` already exported (`FAST_FUNC`), fd-based | None expected | Not started |
+| CVE-2021-42374 (unlzma) | `unpack_lzma_stream` already exported (`FAST_FUNC`), fd-based | None expected | Not started |
+| CVE-2021-42373 (man) | `man_main` itself is the entry point, already externally visible | None for linkage; needs AFL's argv-fuzzing mode instead of byte-buffer, and an unverified filesystem/env-var dependency (`/etc/man*.conf`, `MANDATORY_MANPATH`) needs checking | Not started |
+| CVE-2021-42386 (awk) | `nvalloc` is `static`, but `awk_main` (self-contained, externally visible) is the natural entry point | None expected at the entry level; needs both argv and file-content fuzzing (script + input text) | Not started |
+
+The CVE-2026-29004 harness confirms the general recipe: append a small
+`main()` to the end of the same source file as the candidate function
+(sidesteps `static` linkage without changing any existing signature),
+compile that one file with `afl-clang-fast -O0 -fsanitize=address`, and
+link against the rest of the already-built (non-instrumented) object
+graph — ASAN's `malloc`/`free` interposition is global, so this still
+catches heap-safety bugs even though most of the linked objects aren't
+themselves instrumented. Full build/verification details in
+`dynamic-analysis/cve-2026-29004/PROVENANCE.md`.
+
 ## 2. Fuzzer inputs
 
 ### Which cases (by Tier B disposition, not the original TP/FP label)
@@ -346,4 +376,6 @@ must never quietly become "cleared."
 | Seed content: generic/structural vs. trigger-adjacent | **Open — pending mentor input** |
 | Compute: local machine vs. cloud rental | **Resolved: local machine only** |
 | AFL++ toolchain setup | **Resolved and verified working** (Section 9) |
+| AFLNet vs. AFL++ | **Resolved: AFL++ for all 5 cases** — none need multi-message state (Section 1) |
+| Per-case harness feasibility | **Verified for all 5** via real source (Section 1a); 1 of 5 built and crash-repro verified, 4 not started |
 | FP-removal evidentiary bar | Defined (Section 7) |
