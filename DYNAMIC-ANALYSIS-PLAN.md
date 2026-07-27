@@ -27,26 +27,20 @@ specifically to do two things static analysis in this project cannot:
   proof of safety. Section 7 defines exactly what evidentiary bar must be
   met before a case can be marked cleared.
 
-**Scope decision (resolved): BusyBox only, for now.** The Netgear
-`httpd` case is a genuinely stateful, multi-request network daemon, with no
-source available (proprietary ARM binary). Fuzzing it properly needs a
-protocol-state-aware fuzzer (AFLNet) combined with binary-only
-instrumentation (QEMU mode) — a combination without a well-established,
-solved integration path. Rather than absorb that risk into the same
-timeline as the tractable BusyBox cases, Netgear/`httpd` is deferred as an
-explicit stretch goal, revisited only once the BusyBox pipeline works
-end-to-end. This mirrors the same "MVP now, harder capability deferred"
-discipline already used for Tier B's own scoping.
+**Scope decision (resolved): BusyBox only.** The Netgear `httpd` case
+(proprietary ARM binary, no source, genuinely stateful multi-request
+daemon, needing AFLNet + QEMU mode with no well-established solved
+integration path) is **out of scope for the remaining one-week extension
+timeline** — not merely deferred. It is not being planned or pursued
+further here.
 
 ## 1. Fuzzer choice
 
-| Target class | Fuzzer | Why |
-|---|---|---|
-| BusyBox applets (all 5 CVEs — single-shot: process one packet/stream/argv/script and exit) | **AFL++**, source-instrumented (`afl-cc`/`afl-clang-fast`) | Actively maintained standard choice; source is already available at the exact resolved commits from the Tier B binary corpus work |
-| Netgear `httpd` (deferred) | AFLNet + QEMU mode (unconfirmed integration) | A real stateful network daemon needs protocol-state-aware fuzzing, not single-input AFL++; explicitly out of scope until BusyBox is proven out |
-
-Original AFL is not used — it is unmaintained; AFL++ is its actively
-developed successor and the standard default for this class of target.
+**AFL++**, source-instrumented (`afl-cc`/`afl-clang-fast`), for all 5
+BusyBox CVEs. Source is already available at the exact resolved commits
+from the Tier B binary corpus work. Original AFL is not used — it is
+unmaintained; AFL++ is its actively developed successor and the standard
+default for this class of target.
 
 ## 2. Fuzzer inputs
 
@@ -82,30 +76,139 @@ using AFL++'s default undirected strategy.
 
 ## 3. Initial seed creation
 
-**Open decision, explicitly unresolved — pending mentor input**: should
-seeds stay generic (protocol/format-valid but not derived from the specific
-known trigger condition), relying on the directed search to reach the
-target efficiently while leaving the actual triggering values to be
-discovered by mutation — or should seeds be constructed closer to the known
-trigger, prioritizing speed and certainty of finding the crash over
-independence of the confirmation? The former produces a stronger, more
-independent confirmation if a crash is found; the latter is faster and
-lower-risk if time is very limited. Revisit once there's more clarity on
-how much of the timeline is available for this stage.
+**Steering input from the 2026-07-27 supervisor meeting note: an LLM should
+generate the seeds.** The design below is derived from a directly relevant
+reference paper the supervisor shared —
+*LLMIF: Augmented Large Language Model for Fuzzing IoT Devices*
+(Wang, Yu, Luo — IEEE S&P 2024) — which builds an LLM-augmented fuzzer for
+the Zigbee IoT protocol and hits the same core problem this project has:
+how does an LLM produce a *correct, well-formed* seed for a real protocol
+without hallucinating the format.
 
-Per-case seed construction, regardless of which side of the above decision
-is taken:
+### The paper's key validated finding — already consistent with a decision made here
 
-| CVE | Input shape | Seed source |
-|---|---|---|
-| CVE-2026-29004 (udhcpc6, heap overflow) | DHCPv6 option TLV bytes | Hand-constructed from the RFC, or a captured real exchange |
-| CVE-2017-15873 (bunzip2, integer overflow) | compressed bzip2 stream | Compress a small real file with the actual `bzip2` tool |
-| CVE-2021-42374 (unlzma, OOB read) | compressed LZMA stream | Compress a small real file with the actual `lzma` tool |
-| CVE-2021-42373 (man, NULL deref) | **CLI arguments**, not a byte buffer | Requires AFL's argv-fuzzing mode (`@@`-file-to-argv or a custom persistent-mode argv constructor) — structurally different harness from the others |
-| CVE-2021-42386 (awk, use-after-free) | two-part input (script + data) | Harness must split fuzzed bytes into both parts; seed with one small, valid, real awk program plus matching input text |
+LLMIF directly tested whether general-purpose LLMs (GPT, Llama 2, PaLM,
+Claude) can construct correct protocol message formats from their own
+knowledge alone, with no specification given: **15.6% recall** across 96
+message types — badly insufficient. Their fix: ground the LLM in the
+actual specification document text before asking it to do anything
+format-related ("background-augmented prompting" — retrieve the relevant
+spec section, concatenate it with the task instruction, rather than
+relying on the model's memorized knowledge).
 
-Minimize and deduplicate the initial seed set (`afl-cmin`/`afl-tmin`)
-before starting each campaign.
+This directly confirms a choice already made in this plan: for the two
+compression-format cases (bzip2, LZMA), skip asking any LLM to construct
+the binary format from description or memory — just run the real
+`bzip2`/`lzma` tool. LLMIF's own data is a strong independent argument for
+exactly that decision. For the DHCPv6 case, it means the LLM must be given
+the actual relevant text of RFC 8415, not asked to produce a DHCPv6 packet
+from parametric knowledge.
+
+### The design change this resolves — the vulnerability-class-hint question
+
+LLMIF's LLM extracts, purely from the specification's own stated
+constraints, two categories of field values, and **never mentions
+vulnerabilities, security, or bug classes anywhere in the process**:
+
+- **Functioning values** — values that trigger specific documented
+  behavior.
+- **Dangerous values** — values *outside the range the specification
+  itself declares valid* (their example: a field documented as valid only
+  in `0x0001–0xfff7`; anything outside that range is a "dangerous value"
+  candidate, purely because the spec itself says so).
+
+Their actual prompt templates ask only for format extraction, dependency
+reasoning, or spec-conformance checking — never anything resembling "find
+an exploitable weakness." The word "vulnerability" does not appear in any
+prompt they show.
+
+**This is adopted as the design here, replacing the earlier binary
+"tell it the class or don't" framing**: the LLM is never asked to reason
+about vulnerabilities at all. It is asked to extract, for each field the
+candidate code reads, the *valid range or constraint* — from the actual
+specification text where one exists (DHCPv6/RFC 8415), or from explicit
+bounds-checks visible in the candidate's own decompiled code where no
+external spec exists (the compression/CLI/script cases, where the code's
+own comparisons reveal what range it assumes). "Dangerous" seed candidates
+are then simply values that exceed or violate that extracted bound — a
+byproduct of a purely descriptive task, not a security-framed one. This
+should still be confirmed with the supervisor as the actual resolution
+(rather than assumed), since it's a specific interpretation of a general
+note, but it substantially narrows the open question rather than leaving
+it a coin flip.
+
+**Still open**: how close to the *exact* known trigger condition seeds
+should land. The bounds-extraction approach above naturally produces
+boundary-adjacent candidates without ever citing the literal known-correct
+trigger value, which is the same "informed search, not handed-over
+answer" principle already used for directed fuzzing — but worth confirming
+explicitly rather than assuming it fully resolves this too.
+
+### Design: what the LLM does, in two separated phases
+
+Mirrors LLMIF's structure: extract knowledge **once** per case/variant,
+then use that extracted knowledge to drive seed generation and mutation
+across many fuzzing rounds — not re-invoking the LLM inside the fuzzing
+loop itself.
+
+**Phase 1 — extraction (once per case, per variant):**
+
+Input: the target's input format description (RFC text where one exists;
+otherwise the candidate function's own decompiled/source code) plus the
+candidate function's real code.
+
+Output: (a) the field structure of the input the candidate function reads,
+(b) for each field, its valid range or constraint as stated by the spec or
+implied by the code's own checks, (c) "dangerous" candidate values derived
+from violating that constraint.
+
+**Phase 2 — seed generation (from the Phase 1 output, no further LLM
+reasoning needed):**
+
+Construct a small diverse set (roughly 5–10) of format-valid candidate
+inputs from the extracted field structure, populated with a mix of typical
+values and the extracted "dangerous" (boundary/out-of-range) values per
+field — directly reusable as AFL++ dictionary tokens too (`-x`), not just
+initial seeds, extending the directed-fuzzing approach from Section 2 with
+informed mutation hints rather than only an informed starting point.
+
+**Validation before use** (non-negotiable — discovered directly while
+setting up AFL++ itself: it refuses to start without a seed that doesn't
+already crash):
+
+1. Run every generated seed against the real target once, standalone,
+   before handing it to AFL++. Confirm it doesn't itself crash, and that
+   it's structurally well-formed rather than hallucinated-looking.
+2. If a generated seed *does* crash on its own, that is a distinct finding
+   in itself — the LLM's static reasoning found the issue directly,
+   without the fuzzer's search. Report it as that, separately from a
+   fuzzer-discovered crash; do not quietly use it as a seed.
+3. Deduplicate/minimize the resulting seed set (`afl-cmin`/`afl-tmin`)
+   before starting each campaign.
+4. Log the exact model, prompt, and raw output used for both phases,
+   versioned per case/variant — auditable, not a black-box step.
+
+LLMIF's remaining phases (type-aware/header-aware mutation operators, and
+LLM-based "response reasoning" to judge whether a device's reply indicates
+a meaningful state transition) are not carried over here: the mutation
+operators are effectively subsumed by AFL++'s own havoc engine plus the
+dictionary from Phase 2, and "response reasoning" is specific to a
+stateful device that returns structured responses (Zigbee, or the
+out-of-scope Netgear case) — the BusyBox targets just crash or don't, with
+no separate response semantics to reason about.
+
+### Per-case input format — where it actually comes from
+
+Only one of the five cases is genuinely defined by an RFC; worth being
+precise about this rather than assuming "read the spec" applies uniformly:
+
+| CVE | Input shape | Format source | Practical approach |
+|---|---|---|---|
+| CVE-2026-29004 (udhcpc6, heap overflow) | DHCPv6 option TLV bytes | **RFC 8415** (the actual DHCPv6 spec) | The one case where reading the spec and constructing bytes from it is the right approach — either by the LLM or a captured real exchange |
+| CVE-2017-15873 (bunzip2, integer overflow) | compressed bzip2 stream | No RFC — a de facto format spec, not a formal standard | **Skip spec reconstruction entirely** — compress a small real file with the actual `bzip2` tool. Produces a genuinely valid stream instantly, more reliable than reconstructing the binary layout from a description |
+| CVE-2021-42374 (unlzma, OOB read) | compressed LZMA stream | No RFC — vendor documentation (7-Zip/LZMA SDK) | Same as above — compress with the real `lzma`/`xz` tool |
+| CVE-2021-42373 (man, NULL deref) | **CLI arguments**, not a byte buffer | No RFC — just BusyBox's own `man` applet usage convention | Trivial, not a binary format — "give it 0–2 simple strings." Requires AFL's argv-fuzzing mode (`@@`-file-to-argv or a custom persistent-mode argv constructor) — structurally different harness from the others |
+| CVE-2021-42386 (awk, use-after-free) | two-part input (script + data) | No RFC — **POSIX** (IEEE Std 1003.1) defines the awk language | An LLM can write a small valid awk script directly from general knowledge; no spec lookup needed. Harness must split fuzzed bytes into both parts |
 
 ## 4. Budget / resource projection
 
@@ -196,12 +299,27 @@ must never quietly become "cleared."
 
 ## 9. Other open items worth deciding before implementation
 
-- **Environment fragility risk.** `afl-clang-fast`'s instrumentation is
-  sensitive to specific LLVM/clang versions. This project already hit one
-  real host-environment problem building BusyBox (legacy applets against
-  modern kernel/glibc headers). Worth keeping Docker in mind as a fallback
-  if the AFL++ build itself turns out fragile on this host, rather than
-  assuming it will just work.
+- **Environment setup — resolved and verified, not just a risk anymore.**
+  AFL++ is already installed on this host (system package, `afl++ 4.09c`)
+  and was directly verified end-to-end: a deliberately planted, realistic
+  (runtime-dependent, conditionally-triggered) bug was found autonomously
+  by `afl-fuzz` from a non-crashing seed plus a dictionary hint, with no
+  ground-truth trigger ever supplied. Four environment-specific settings
+  are required and now confirmed necessary:
+  1. Must run outside this session's default sandboxed execution — the
+     sandbox silently prevented ASAN from ever reporting a real,
+     deliberately planted crash.
+  2. `ASAN_OPTIONS=symbolize=0:abort_on_error=1` — avoids a symbolizer
+     hang and makes ASAN actually abort (not just `exit()`) so AFL's fork
+     server recognizes it as a crash.
+  3. `AFL_SKIP_CPUFREQ=1` — bypasses an irrelevant CPU-governor check.
+  4. **Compile targets at `-O0`, not `-O1` or higher.** Empirically
+     confirmed on this LLVM toolchain (reproduced identically with plain
+     system `clang`, so this is not AFL-specific): `-O1` and `-O3` can
+     both eliminate or mask a real, runtime-dependent heap overflow that
+     `-O0` catches correctly and reliably. This also happens to be
+     standard fuzzing/ASAN practice already, not merely a local
+     workaround.
 - **Relationship to the open mentor decision on the two remaining static
   limitations.** If Stage 9 successfully crashes CVE-2017-15873 or
   CVE-2021-42374, that resolves them directly — dynamic execution sidesteps
@@ -219,10 +337,13 @@ must never quietly become "cleared."
 
 | Decision | Status |
 |---|---|
-| Fuzzer: AFL++ for BusyBox, AFLNet+QEMU for Netgear | Resolved — AFL++ for BusyBox now |
-| Scope: BusyBox only vs. BusyBox + Netgear together | **Resolved: BusyBox only for now** |
+| Fuzzer | **Resolved: AFL++** for all 5 BusyBox CVEs |
+| Scope: Netgear | **Resolved: out of scope, abandoned for this timeline** |
 | Case priority: which dispositions to fuzz first | Proposed (3-tier), open to narrowing |
 | Directed vs. blind fuzzing | **Resolved: directed** |
-| Seed strategy: generic vs. trigger-adjacent | **Open — pending mentor input** |
+| Seed generation method | **Resolved: LLM-generated, two-phase extraction-then-generation**, derived from LLMIF (Section 3) |
+| Seed content: vulnerability-class hint given to the LLM | **Substantially resolved by design: LLM never reasons about vulnerabilities at all, only extracts declared/implied value bounds** — confirm this interpretation with supervisor |
+| Seed content: generic/structural vs. trigger-adjacent | **Open — pending mentor input** |
 | Compute: local machine vs. cloud rental | **Resolved: local machine only** |
+| AFL++ toolchain setup | **Resolved and verified working** (Section 9) |
 | FP-removal evidentiary bar | Defined (Section 7) |
