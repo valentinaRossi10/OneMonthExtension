@@ -1,0 +1,237 @@
+{
+  "false_negatives": [
+    {
+      "indexed_bug_class": "use-after-free",
+      "summary": "No release operation is displayed in the function. The list manipulation and later pointer uses do not establish a surviving alias used after free, and freeing behavior cannot be inferred for the opaque callee at line 25.",
+      "task_id": "CVE-2021-42386__vulnerable__use-after-free"
+    }
+  ],
+  "false_positives": [
+    {
+      "reason": "mismatched target class flagged",
+      "summary": "Line 23 narrows both 64-bit pointer values to 32-bit int and performs signed subtraction and subtraction by 4; feasible low-half values can overflow/wrap and produce a nonnegative, incorrect remaining length. That corrupted value gates loop entry and the option-length check at lines 25 and 29, allowing data-dependent reads and pointer advancement at line 26 despite an invalid computed bound.",
+      "task_id": "CVE-2026-29004__vulnerable__integer-overflow"
+    },
+    {
+      "reason": "mismatched target class flagged",
+      "summary": "param_1 is not checked for NULL. A feasible entry with param_1 == NULL and param_2 producing a nonnegative iVar13 passes the first short-circuit operand at line 25, causing *param_1 to be evaluated and dereferenced.",
+      "task_id": "CVE-2026-29004__vulnerable__null-pointer-dereference"
+    },
+    {
+      "reason": "mismatched target class flagged",
+      "summary": "The loop establishes only that four bytes remain, and line 29 checks the declared payload length bVar1 rather than the fixed offset used later. With param_2 == param_1 + 4, bVar1 == 0, and bVar2 == 0x1a, the checks pass and line 36 reads four bytes from param_1 + 8, beyond the inferred [param_1, param_2) extent.",
+      "task_id": "CVE-2026-29004__vulnerable__out-of-bounds-read"
+    },
+    {
+      "reason": "patched code flagged",
+      "summary": "Line 23 truncates both pointers to inferred 32-bit signed int values and performs subtraction plus -4, which can overflow or wrap for plausible pointer values. The resulting iVar13 controls the local bounds checks at lines 25 and 29; a wrapped nonnegative value can admit the loop and permit reads and pointer advancement at lines 25-27 despite an invalid range.",
+      "task_id": "CVE-2026-29004__patched__integer-overflow"
+    },
+    {
+      "reason": "patched code flagged",
+      "summary": "If param_1 is NULL and line 23 produces iVar13 >= 0 for a suitable param_2, short-circuit evaluation at line 25 reaches *param_1. No NULL guard precedes this dereference.",
+      "task_id": "CVE-2026-29004__patched__null-pointer-dereference"
+    },
+    {
+      "reason": "patched code flagged",
+      "summary": "The loop can enter with only four bytes remaining, and the length check accepts bVar1 == 0. If bVar2 == 0x1a, line 36 then reads four bytes at param_1 + 8, beyond the param_2 bound on that feasible path.",
+      "task_id": "CVE-2026-29004__patched__out-of-bounds-read"
+    },
+    {
+      "reason": "mismatched target class flagged",
+      "summary": "The pointer parameter param_1 has no preceding NULL guard and is dereferenced immediately at line 40. Thus, a NULL param_1 reaches an unsafe use on function entry.",
+      "task_id": "CVE-2017-15873__vulnerable__null-pointer-dereference"
+    }
+  ],
+  "limited_observability_tasks": [
+    {
+      "category": "false_negative",
+      "reason": "The isolated nvalloc body does not show the freeing operation, retained stale alias, and later dereference needed to prove the indexed cross-function use-after-free.",
+      "task_id": "CVE-2021-42386__vulnerable__use-after-free"
+    }
+  ],
+  "overall": {
+    "balanced_accuracy": 0.23636363636363636,
+    "counts": {
+      "abstention": 3,
+      "false_negative": 1,
+      "false_positive": 7,
+      "invalid_output": 2,
+      "missing_output": 31,
+      "true_negative": 15,
+      "true_positive": 1
+    },
+    "decision_coverage": 0.4,
+    "end_to_end_recall": 0.2,
+    "end_to_end_specificity": 0.2727272727272727,
+    "expected_negatives": 55,
+    "expected_positives": 5,
+    "f1": 0.15384615384615385,
+    "false_positive_rate": 0.12727272727272726,
+    "observable_positive_recall": 0.25,
+    "precision": 0.125,
+    "strict_accuracy": 0.26666666666666666,
+    "tasks": 60
+  },
+  "per_class": {
+    "command-injection": {
+      "balanced_accuracy": null,
+      "counts": {
+        "missing_output": 6,
+        "true_negative": 4
+      },
+      "decision_coverage": 0.4,
+      "end_to_end_recall": null,
+      "end_to_end_specificity": 0.4,
+      "expected_negatives": 10,
+      "expected_positives": 0,
+      "f1": null,
+      "false_positive_rate": 0.0,
+      "observable_positive_recall": null,
+      "precision": null,
+      "strict_accuracy": 0.4,
+      "tasks": 10
+    },
+    "heap-buffer-overflow": {
+      "balanced_accuracy": 0.6111111111111112,
+      "counts": {
+        "abstention": 2,
+        "missing_output": 5,
+        "true_negative": 2,
+        "true_positive": 1
+      },
+      "decision_coverage": 0.3,
+      "end_to_end_recall": 1.0,
+      "end_to_end_specificity": 0.2222222222222222,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "observable_positive_recall": 1.0,
+      "precision": 1.0,
+      "strict_accuracy": 0.3,
+      "tasks": 10
+    },
+    "integer-overflow": {
+      "balanced_accuracy": 0.1111111111111111,
+      "counts": {
+        "false_positive": 2,
+        "invalid_output": 1,
+        "missing_output": 5,
+        "true_negative": 2
+      },
+      "decision_coverage": 0.4,
+      "end_to_end_recall": 0.0,
+      "end_to_end_specificity": 0.2222222222222222,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": null,
+      "false_positive_rate": 0.2222222222222222,
+      "observable_positive_recall": 0.0,
+      "precision": 0.0,
+      "strict_accuracy": 0.2,
+      "tasks": 10
+    },
+    "null-pointer-dereference": {
+      "balanced_accuracy": 0.05555555555555555,
+      "counts": {
+        "abstention": 1,
+        "false_positive": 3,
+        "missing_output": 5,
+        "true_negative": 1
+      },
+      "decision_coverage": 0.4,
+      "end_to_end_recall": 0.0,
+      "end_to_end_specificity": 0.1111111111111111,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": null,
+      "false_positive_rate": 0.3333333333333333,
+      "observable_positive_recall": 0.0,
+      "precision": 0.0,
+      "strict_accuracy": 0.1,
+      "tasks": 10
+    },
+    "out-of-bounds-read": {
+      "balanced_accuracy": 0.1111111111111111,
+      "counts": {
+        "false_positive": 2,
+        "invalid_output": 1,
+        "missing_output": 5,
+        "true_negative": 2
+      },
+      "decision_coverage": 0.4,
+      "end_to_end_recall": 0.0,
+      "end_to_end_specificity": 0.2222222222222222,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": null,
+      "false_positive_rate": 0.2222222222222222,
+      "observable_positive_recall": 0.0,
+      "precision": 0.0,
+      "strict_accuracy": 0.2,
+      "tasks": 10
+    },
+    "use-after-free": {
+      "balanced_accuracy": 0.2222222222222222,
+      "counts": {
+        "false_negative": 1,
+        "missing_output": 5,
+        "true_negative": 4
+      },
+      "decision_coverage": 0.5,
+      "end_to_end_recall": 0.0,
+      "end_to_end_specificity": 0.4444444444444444,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": null,
+      "false_positive_rate": 0.0,
+      "observable_positive_recall": null,
+      "precision": null,
+      "strict_accuracy": 0.4,
+      "tasks": 10
+    }
+  },
+  "per_representation": {
+    "ghidra_pseudo_c": {
+      "balanced_accuracy": 0.19183673469387758,
+      "counts": {
+        "abstention": 3,
+        "false_negative": 1,
+        "false_positive": 7,
+        "invalid_output": 2,
+        "missing_output": 31,
+        "true_negative": 9,
+        "true_positive": 1
+      },
+      "decision_coverage": 0.3333333333333333,
+      "end_to_end_recall": 0.2,
+      "end_to_end_specificity": 0.1836734693877551,
+      "expected_negatives": 49,
+      "expected_positives": 5,
+      "f1": 0.15384615384615385,
+      "false_positive_rate": 0.14285714285714285,
+      "observable_positive_recall": 0.25,
+      "precision": 0.125,
+      "strict_accuracy": 0.18518518518518517,
+      "tasks": 54
+    },
+    "llvm_ir": {
+      "balanced_accuracy": null,
+      "counts": {
+        "true_negative": 6
+      },
+      "decision_coverage": 1.0,
+      "end_to_end_recall": null,
+      "end_to_end_specificity": 1.0,
+      "expected_negatives": 6,
+      "expected_positives": 0,
+      "f1": null,
+      "false_positive_rate": 0.0,
+      "observable_positive_recall": null,
+      "precision": null,
+      "strict_accuracy": 1.0,
+      "tasks": 6
+    }
+  }
+}

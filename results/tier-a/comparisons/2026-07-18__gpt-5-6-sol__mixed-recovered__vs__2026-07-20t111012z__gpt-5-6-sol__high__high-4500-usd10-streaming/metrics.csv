@@ -1,0 +1,17 @@
+metric,baseline,candidate,delta_candidate_minus_baseline
+decision_coverage,0.8333333333333334,0.75,-0.08333333333333337
+end_to_end_recall,0.6,0.4,-0.19999999999999996
+observable_positive_recall,0.75,0.5,-0.25
+precision,0.21428571428571427,0.15384615384615385,-0.06043956043956042
+end_to_end_specificity,0.6363636363636364,0.5636363636363636,-0.07272727272727275
+false_positive_rate,0.2,0.2,0.0
+balanced_accuracy,0.6181818181818182,0.4818181818181818,-0.13636363636363635
+strict_accuracy,0.6333333333333333,0.55,-0.08333333333333326
+f1,0.3157894736842105,0.2222222222222222,-0.0935672514619883
+count.abstention,10,8,-2
+count.api_error,0,7,7
+count.false_negative,1,1,0
+count.false_positive,11,11,0
+count.true_negative,35,31,-4
+count.true_positive,3,2,-1
+cost.recorded_cumulative_usd,1.88903,3.37444,1.48541

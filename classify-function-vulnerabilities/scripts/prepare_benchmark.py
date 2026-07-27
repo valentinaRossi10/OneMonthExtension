@@ -62,6 +62,12 @@ def main() -> int:
     repo_root = args.repo_root.resolve()
     policy = load_policy()
     limits = policy["limits"]
+    transport = policy.get("transport") or {}
+    transport_mode = transport.get("mode")
+    if transport_mode != "synchronous_streaming":
+        raise ValueError("Active policy must select synchronous_streaming transport")
+    if transport.get("sdk_max_retries") != 0:
+        raise ValueError("Active policy must disable SDK-level retries")
     reasoning_effort = args.reasoning_effort or policy.get("model_settings", {}).get(
         "reasoning_effort"
     )
@@ -102,6 +108,8 @@ def main() -> int:
         "policy_version": policy["policy_version"],
         "prompt_version": policy["prompt_version"],
         "schema_version": policy["schema_version"],
+        "transport_mode": transport_mode,
+        "sdk_max_retries": 0,
         "max_output_tokens": limits["max_output_tokens"],
         "hard_budget_ceiling_usd": limits["max_budget_usd"],
         "input_price_per_million": args.input_price_per_million,
@@ -216,6 +224,7 @@ def main() -> int:
                         policy["policy_version"],
                         policy["prompt_version"],
                         policy["schema_version"],
+                        transport_mode,
                         reasoning_effort,
                         str(limits["max_output_tokens"]),
                         code_hash or "no-code",
@@ -248,6 +257,8 @@ def main() -> int:
                         "policy_version": policy["policy_version"],
                         "prompt_version": policy["prompt_version"],
                         "schema_version": policy["schema_version"],
+                        "transport_mode": transport_mode,
+                        "sdk_max_retries": 0,
                         "prompt_sha256": prompt_hash,
                     }
                 )
@@ -268,6 +279,8 @@ def main() -> int:
         "policy_version": policy["policy_version"],
         "model": args.model,
         "reasoning_effort": reasoning_effort,
+        "transport_mode": transport_mode,
+        "sdk_max_retries": 0,
         "samples": len(samples),
         "variants": len(input_records),
         "classes": len(policy["classes"]),

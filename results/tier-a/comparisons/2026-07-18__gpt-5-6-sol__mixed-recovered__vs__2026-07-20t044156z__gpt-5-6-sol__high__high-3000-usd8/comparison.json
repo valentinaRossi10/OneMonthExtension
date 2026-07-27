@@ -1,0 +1,137 @@
+{
+  "baseline_run_id": "2026-07-18__gpt-5-6-sol__mixed-recovered",
+  "candidate_run_id": "2026-07-20t044156z__gpt-5-6-sol__high__high-3000-usd8",
+  "category_changes": 37,
+  "comparison_id": "2026-07-18__gpt-5-6-sol__mixed-recovered__vs__2026-07-20t044156z__gpt-5-6-sol__high__high-3000-usd8",
+  "comparison_version": "tier-a-comparison-v1",
+  "configuration_changes": [
+    {
+      "baseline": "mixed: provider-default and low",
+      "candidate": "high",
+      "field": "reasoning_effort"
+    },
+    {
+      "baseline": "tier-a-policy-v4",
+      "candidate": "tier-a-policy-v5",
+      "field": "policy_version"
+    },
+    {
+      "baseline": "mixed: 1200 and 1900",
+      "candidate": 3000,
+      "field": "max_output_tokens"
+    },
+    {
+      "baseline": 5.0,
+      "candidate": 8.0,
+      "field": "hard_budget_ceiling_usd"
+    }
+  ],
+  "generated_at_utc": "2026-07-20T05:02:06.121219+00:00",
+  "metric_deltas": [
+    {
+      "baseline": 0.8333333333333334,
+      "candidate": 0.4,
+      "delta_candidate_minus_baseline": -0.43333333333333335,
+      "metric": "decision_coverage"
+    },
+    {
+      "baseline": 0.6,
+      "candidate": 0.2,
+      "delta_candidate_minus_baseline": -0.39999999999999997,
+      "metric": "end_to_end_recall"
+    },
+    {
+      "baseline": 0.75,
+      "candidate": 0.25,
+      "delta_candidate_minus_baseline": -0.5,
+      "metric": "observable_positive_recall"
+    },
+    {
+      "baseline": 0.21428571428571427,
+      "candidate": 0.125,
+      "delta_candidate_minus_baseline": -0.08928571428571427,
+      "metric": "precision"
+    },
+    {
+      "baseline": 0.6363636363636364,
+      "candidate": 0.2727272727272727,
+      "delta_candidate_minus_baseline": -0.36363636363636365,
+      "metric": "end_to_end_specificity"
+    },
+    {
+      "baseline": 0.2,
+      "candidate": 0.12727272727272726,
+      "delta_candidate_minus_baseline": -0.07272727272727275,
+      "metric": "false_positive_rate"
+    },
+    {
+      "baseline": 0.6181818181818182,
+      "candidate": 0.23636363636363636,
+      "delta_candidate_minus_baseline": -0.38181818181818183,
+      "metric": "balanced_accuracy"
+    },
+    {
+      "baseline": 0.6333333333333333,
+      "candidate": 0.26666666666666666,
+      "delta_candidate_minus_baseline": -0.36666666666666664,
+      "metric": "strict_accuracy"
+    },
+    {
+      "baseline": 0.3157894736842105,
+      "candidate": 0.15384615384615385,
+      "delta_candidate_minus_baseline": -0.16194331983805665,
+      "metric": "f1"
+    },
+    {
+      "baseline": 10,
+      "candidate": 3,
+      "delta_candidate_minus_baseline": -7,
+      "metric": "count.abstention"
+    },
+    {
+      "baseline": 1,
+      "candidate": 1,
+      "delta_candidate_minus_baseline": 0,
+      "metric": "count.false_negative"
+    },
+    {
+      "baseline": 11,
+      "candidate": 7,
+      "delta_candidate_minus_baseline": -4,
+      "metric": "count.false_positive"
+    },
+    {
+      "baseline": 0,
+      "candidate": 2,
+      "delta_candidate_minus_baseline": 2,
+      "metric": "count.invalid_output"
+    },
+    {
+      "baseline": 0,
+      "candidate": 31,
+      "delta_candidate_minus_baseline": 31,
+      "metric": "count.missing_output"
+    },
+    {
+      "baseline": 35,
+      "candidate": 15,
+      "delta_candidate_minus_baseline": -20,
+      "metric": "count.true_negative"
+    },
+    {
+      "baseline": 3,
+      "candidate": 1,
+      "delta_candidate_minus_baseline": -2,
+      "metric": "count.true_positive"
+    },
+    {
+      "baseline": 1.88903,
+      "candidate": 1.40728,
+      "delta_candidate_minus_baseline": -0.4817499999999999,
+      "metric": "cost.recorded_cumulative_usd"
+    }
+  ],
+  "per_class_metric_rows": 54,
+  "tasks": 60,
+  "verdict_changes": 37
+}

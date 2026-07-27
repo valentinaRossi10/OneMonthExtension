@@ -31,15 +31,15 @@ Use Ghidra pseudo-C first. When it is missing, extract only the indexed function
 
    The preparer creates a unique `results/tier-a/runs/<run-id>/`, writes its README and machine-readable metadata, and refuses to overwrite an existing run ID.
 4. Review the new run's README and manifest summary, especially configuration differences, task count, largest input, guard skips, estimated tokens, and worst-case projected cost.
-5. Keep the run ceiling at or below USD 5. Require current pricing and an explicit `--execute` flag. Do not proceed when the projection exceeds the ceiling.
-6. Run the benchmark. Let the runner perform a pseudo-C and LLVM compatibility preflight before releasing the remaining tasks:
+5. Keep the run ceiling at or below USD 10. Require current pricing and an explicit `--execute` flag. Do not proceed when the projection exceeds the ceiling.
+6. Run the benchmark. Let the runner perform a pseudo-C and LLVM compatibility preflight before releasing the remaining tasks. The active policy uses one synchronous SSE stream per paid request and disables SDK-level retries:
 
    ```bash
    python3 classify-function-vulnerabilities/scripts/run_benchmark.py \
      --run-dir results/tier-a/runs/<run-id> \
      --input-price-per-million <current-price> \
      --output-price-per-million <current-price> \
-     --budget-usd 5 \
+     --budget-usd 10 \
      --execute
    ```
 
@@ -59,11 +59,12 @@ Use Ghidra pseudo-C first. When it is missing, extract only the indexed function
 - Do not expose the CVE ID, variant, indexed class, description, source filename, or paired function to the model.
 - Anonymize only the displayed target-function name. Strip LLVM debug intrinsics and metadata; preserve the remaining code structure.
 - Reject inputs above 50,000 characters or an estimated 16,000 input tokens before any API call.
-- Freeze model, reasoning effort, output-token cap, policy/prompt/schema versions, and pricing per run. Include reasoning effort and output-token cap in the cache identity.
+- Freeze model, reasoning effort, output-token cap, transport mode, SDK retry setting, policy/prompt/schema versions, and pricing per run. Include these settings in the cache identity.
 - Store each experiment under a new immutable run ID. Never point preparation at an existing run or mix responses from different reasoning settings.
 - Cache within a run by task, model, prompt version, reasoning effort, output-token cap, and code hash. Resume without repeating successful calls.
 - Record refusals and errors as explicit statuses. Never interpret empty or failed output as `not_vulnerable`.
 - Keep all attempts in the append-only `results.jsonl`; reconstruct cumulative spend from every recorded request before resuming or retrying.
+- Stop immediately if provider-reported usage exceeds the request's frozen output-token cap.
 - Allow `indeterminate`; report it as abstention with no correctness credit.
 - Report CVE-2021-42386's use-after-free positive separately as a known function-local observability limitation.
 - Treat mismatched-class negatives as benchmark labels, not proof that no secondary weakness exists.

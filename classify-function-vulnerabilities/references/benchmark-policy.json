@@ -1,7 +1,11 @@
 {
-  "policy_version": "tier-a-policy-v4",
+  "policy_version": "tier-a-policy-v8",
   "prompt_version": "tier-a-prompt-v1",
   "schema_version": "tier-a-result-v1",
+  "transport": {
+    "mode": "synchronous_streaming",
+    "sdk_max_retries": 0
+  },
   "model_settings": {
     "reasoning_effort": "low"
   },
@@ -16,10 +20,10 @@
   "limits": {
     "max_code_chars": 50000,
     "max_estimated_input_tokens": 16000,
-    "max_output_tokens": 1900,
+    "max_output_tokens": 4500,
     "max_requests": 60,
     "max_retries": 2,
-    "max_budget_usd": 5.0
+    "max_budget_usd": 10.0
   },
   "known_limited_observability": [
     {

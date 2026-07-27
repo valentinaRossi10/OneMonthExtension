@@ -1,0 +1,203 @@
+{
+  "false_negatives": [],
+  "false_positives": [
+    {
+      "reason": "mismatched target class flagged",
+      "summary": "Line 23 narrows 64-bit pointers to signed 32-bit integers before subtracting and subtracting four; plausible low-32-bit values spanning the signed boundary can wrap and produce a large nonnegative iVar13 even when param_2 does not bound param_1. That corrupted value controls the loop-entry and option-length checks at lines 25 and 29, permitting local reads and pointer advancement at line 26 beyond the intended end pointer.",
+      "task_id": "CVE-2026-29004__vulnerable__integer-overflow"
+    },
+    {
+      "reason": "mismatched target class flagged",
+      "summary": "param_1 has no non-NULL guard. When the value computed at line 23 makes -1 < iVar13 true, short-circuit evaluation reaches *param_1 at line 25 and dereferences a potentially NULL pointer.",
+      "task_id": "CVE-2026-29004__vulnerable__null-pointer-dereference"
+    },
+    {
+      "reason": "mismatched target class flagged",
+      "summary": "A feasible path has param_2 == param_1 + 4, making iVar13 zero, with a valid four-byte header whose type is 0x1a and length byte is zero. The loop and line 29 checks pass, but line 36 performs a four-byte read at param_1 + 8, beyond the bound represented by param_2.",
+      "task_id": "CVE-2026-29004__vulnerable__out-of-bounds-read"
+    }
+  ],
+  "limited_observability_tasks": [
+    {
+      "category": "missing_output",
+      "reason": "The isolated nvalloc body does not show the freeing operation, retained stale alias, and later dereference needed to prove the indexed cross-function use-after-free.",
+      "task_id": "CVE-2021-42386__vulnerable__use-after-free"
+    }
+  ],
+  "overall": {
+    "balanced_accuracy": 0.13636363636363635,
+    "counts": {
+      "abstention": 1,
+      "false_positive": 3,
+      "invalid_output": 1,
+      "missing_output": 50,
+      "true_negative": 4,
+      "true_positive": 1
+    },
+    "decision_coverage": 0.13333333333333333,
+    "end_to_end_recall": 0.2,
+    "end_to_end_specificity": 0.07272727272727272,
+    "expected_negatives": 55,
+    "expected_positives": 5,
+    "f1": 0.22222222222222224,
+    "false_positive_rate": 0.05454545454545454,
+    "observable_positive_recall": 0.25,
+    "precision": 0.25,
+    "strict_accuracy": 0.08333333333333333,
+    "tasks": 60
+  },
+  "per_class": {
+    "command-injection": {
+      "balanced_accuracy": null,
+      "counts": {
+        "missing_output": 9,
+        "true_negative": 1
+      },
+      "decision_coverage": 0.1,
+      "end_to_end_recall": null,
+      "end_to_end_specificity": 0.1,
+      "expected_negatives": 10,
+      "expected_positives": 0,
+      "f1": null,
+      "false_positive_rate": 0.0,
+      "observable_positive_recall": null,
+      "precision": null,
+      "strict_accuracy": 0.1,
+      "tasks": 10
+    },
+    "heap-buffer-overflow": {
+      "balanced_accuracy": 0.5,
+      "counts": {
+        "abstention": 1,
+        "missing_output": 8,
+        "true_positive": 1
+      },
+      "decision_coverage": 0.1,
+      "end_to_end_recall": 1.0,
+      "end_to_end_specificity": 0.0,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": 1.0,
+      "false_positive_rate": 0.0,
+      "observable_positive_recall": 1.0,
+      "precision": 1.0,
+      "strict_accuracy": 0.1,
+      "tasks": 10
+    },
+    "integer-overflow": {
+      "balanced_accuracy": 0.0,
+      "counts": {
+        "false_positive": 1,
+        "invalid_output": 1,
+        "missing_output": 8
+      },
+      "decision_coverage": 0.1,
+      "end_to_end_recall": 0.0,
+      "end_to_end_specificity": 0.0,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": null,
+      "false_positive_rate": 0.1111111111111111,
+      "observable_positive_recall": 0.0,
+      "precision": 0.0,
+      "strict_accuracy": 0.0,
+      "tasks": 10
+    },
+    "null-pointer-dereference": {
+      "balanced_accuracy": 0.0,
+      "counts": {
+        "false_positive": 1,
+        "missing_output": 9
+      },
+      "decision_coverage": 0.1,
+      "end_to_end_recall": 0.0,
+      "end_to_end_specificity": 0.0,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": null,
+      "false_positive_rate": 0.1111111111111111,
+      "observable_positive_recall": 0.0,
+      "precision": 0.0,
+      "strict_accuracy": 0.0,
+      "tasks": 10
+    },
+    "out-of-bounds-read": {
+      "balanced_accuracy": 0.0,
+      "counts": {
+        "false_positive": 1,
+        "missing_output": 9
+      },
+      "decision_coverage": 0.1,
+      "end_to_end_recall": 0.0,
+      "end_to_end_specificity": 0.0,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": null,
+      "false_positive_rate": 0.1111111111111111,
+      "observable_positive_recall": 0.0,
+      "precision": 0.0,
+      "strict_accuracy": 0.0,
+      "tasks": 10
+    },
+    "use-after-free": {
+      "balanced_accuracy": 0.16666666666666666,
+      "counts": {
+        "missing_output": 7,
+        "true_negative": 3
+      },
+      "decision_coverage": 0.3,
+      "end_to_end_recall": 0.0,
+      "end_to_end_specificity": 0.3333333333333333,
+      "expected_negatives": 9,
+      "expected_positives": 1,
+      "f1": null,
+      "false_positive_rate": 0.0,
+      "observable_positive_recall": null,
+      "precision": null,
+      "strict_accuracy": 0.3,
+      "tasks": 10
+    }
+  },
+  "per_representation": {
+    "ghidra_pseudo_c": {
+      "balanced_accuracy": 0.1306122448979592,
+      "counts": {
+        "abstention": 1,
+        "false_positive": 3,
+        "invalid_output": 1,
+        "missing_output": 45,
+        "true_negative": 3,
+        "true_positive": 1
+      },
+      "decision_coverage": 0.12962962962962962,
+      "end_to_end_recall": 0.2,
+      "end_to_end_specificity": 0.061224489795918366,
+      "expected_negatives": 49,
+      "expected_positives": 5,
+      "f1": 0.22222222222222224,
+      "false_positive_rate": 0.061224489795918366,
+      "observable_positive_recall": 0.25,
+      "precision": 0.25,
+      "strict_accuracy": 0.07407407407407407,
+      "tasks": 54
+    },
+    "llvm_ir": {
+      "balanced_accuracy": null,
+      "counts": {
+        "missing_output": 5,
+        "true_negative": 1
+      },
+      "decision_coverage": 0.16666666666666666,
+      "end_to_end_recall": null,
+      "end_to_end_specificity": 0.16666666666666666,
+      "expected_negatives": 6,
+      "expected_positives": 0,
+      "f1": null,
+      "false_positive_rate": 0.0,
+      "observable_positive_recall": null,
+      "precision": null,
+      "strict_accuracy": 0.16666666666666666,
+      "tasks": 6
+    }
+  }
+}

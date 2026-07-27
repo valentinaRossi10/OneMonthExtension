@@ -131,7 +131,13 @@ def call_openai(
     }
     if reasoning_effort:
         request["reasoning"] = {"effort": reasoning_effort}
-    response = client.responses.create(**request)
+    # Keep one synchronous SSE connection open for the paid request. This
+    # avoids background-mode accounting while preventing a long reasoning
+    # request from sitting behind one idle HTTP response.
+    with client.responses.stream(**request) as stream:
+        for _event in stream:
+            pass
+        response = stream.get_final_response()
     latency = time.monotonic() - started
     text, refusal = response_text_and_refusal(response)
     usage = usage_dict(response)
@@ -142,6 +148,20 @@ def call_openai(
         "usage": usage,
         "raw_response_text": text,
     }
+    reported_output_tokens = usage.get("output_tokens")
+    if (
+        isinstance(reported_output_tokens, int)
+        and reported_output_tokens > max_output_tokens
+    ):
+        return {
+            **base,
+            "status": "budget_breach",
+            "error": (
+                f"provider reported {reported_output_tokens} output tokens above "
+                f"the requested cap of {max_output_tokens}"
+            ),
+            "parsed_result": None,
+        }
     if refusal:
         return {**base, "status": "refusal", "error": refusal, "parsed_result": None}
     if not text:
@@ -190,6 +210,11 @@ def main() -> int:
     args = parse_args()
     policy = load_policy()
     limits = policy["limits"]
+    transport = policy.get("transport") or {}
+    if transport.get("mode") != "synchronous_streaming":
+        raise ValueError("Active policy does not select synchronous streaming")
+    if transport.get("sdk_max_retries") != 0:
+        raise ValueError("Active policy must disable SDK-level retries")
     reviewed_invalid_task_ids = set(args.retry_reviewed_invalid_task)
     run_dir = args.run_dir.resolve()
     metadata = load_metadata(run_dir)
@@ -232,6 +257,14 @@ def main() -> int:
             raise ValueError(f"Run metadata and manifest {field} do not match")
     if metadata.get("max_output_tokens") != max_output_tokens:
         raise ValueError("Run metadata and manifest output-token setting do not match")
+    transport_values = {task.get("transport_mode") for task in tasks}
+    if transport_values != {"synchronous_streaming"}:
+        raise ValueError("Manifest must freeze synchronous_streaming transport")
+    if metadata.get("transport_mode") != "synchronous_streaming":
+        raise ValueError("Run metadata and manifest transport mode do not match")
+    sdk_retry_values = {task.get("sdk_max_retries") for task in tasks}
+    if sdk_retry_values != {0} or metadata.get("sdk_max_retries") != 0:
+        raise ValueError("Run must freeze zero SDK-level retries")
     for field, supplied in (
         ("input_price_per_million", args.input_price_per_million),
         ("output_price_per_million", args.output_price_per_million),
@@ -360,7 +393,10 @@ def main() -> int:
         raise RuntimeError(
             "Install classify-function-vulnerabilities/scripts/requirements.txt before execution"
         ) from exc
-    client = OpenAI(api_key=api_key)
+    # The runner owns all paid-request retries so every attempt is recorded in
+    # results.jsonl and reserved against the cumulative ceiling. SDK-level
+    # retries would be invisible to that ledger.
+    client = OpenAI(api_key=api_key, max_retries=0, timeout=3600.0)
 
     prepared_by_id = {task["task_id"]: (task, prompt, cost) for task, prompt, cost in prepared}
     ordered_ids = [task["task_id"] for task in preflight_tasks]
@@ -451,6 +487,8 @@ def main() -> int:
                 "model": task["model"],
                 "provider": task["provider"],
                 "reasoning_effort": reasoning_effort,
+                "transport_mode": "synchronous_streaming",
+                "sdk_max_retries": 0,
                 "prompt_version": task["prompt_version"],
                 "code_sha256": task["code_sha256"],
                 "attempt": attempts,
@@ -471,7 +509,12 @@ def main() -> int:
             if task_id in preflight_ids:
                 print("BLOCKED: compatibility preflight failed; full run was not released.", file=sys.stderr)
                 return 3
-            if outcome["status"] in {"refusal", "invalid_output", "quota_error"}:
+            if outcome["status"] in {
+                "refusal",
+                "invalid_output",
+                "quota_error",
+                "budget_breach",
+            }:
                 return 3 if outcome["status"] == "refusal" else 4
             if not transient or attempts >= limits["max_retries"]:
                 break

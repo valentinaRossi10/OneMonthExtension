@@ -1,0 +1,39 @@
+{
+  "approved_budget_usd": 10.0,
+  "created_at_utc": "2026-07-20T06:15:56.509898+00:00",
+  "differences_from_previous": [
+    {
+      "current": "tier-a-policy-v7",
+      "field": "policy_version",
+      "previous": "tier-a-policy-v6"
+    }
+  ],
+  "experiment_notes": [
+    "Uniform high-reasoning Tier A replacement after policy-v6 exposed unaudited SDK retries and long-request connection failures; use policy-v7, a 4,500-token cap, hard USD 10 ceiling, background Responses polling, and zero SDK-level retries."
+  ],
+  "hard_budget_ceiling_usd": 10.0,
+  "input_price_per_million": 5.0,
+  "last_dry_run_at_utc": "2026-07-20T10:42:26.843788+00:00",
+  "last_projected_cumulative_cost_usd": 8.390955,
+  "manifest_summary": {
+    "estimated_worst_case_cost_usd": 9.4996,
+    "guarded_or_unavailable_tasks": 0,
+    "pricing_complete": true,
+    "ready_tasks": 60,
+    "tasks": 60
+  },
+  "max_output_tokens": 4500,
+  "metadata_version": "tier-a-run-v1",
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "policy_version": "tier-a-policy-v7",
+  "prepared_at_utc": "2026-07-20T06:15:57.032061+00:00",
+  "previous_run_id": "2026-07-20t050813z__gpt-5-6-sol__high__high-4500-usd10",
+  "previous_run_path": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-a/runs/2026-07-20t050813z__gpt-5-6-sol__high__high-4500-usd10",
+  "prompt_version": "tier-a-prompt-v1",
+  "reasoning_effort": "high",
+  "run_date_utc": "2026-07-20",
+  "run_id": "2026-07-20t061556z__gpt-5-6-sol__high__high-4500-usd10-background",
+  "schema_version": "tier-a-result-v1",
+  "status": "dry-run"
+}

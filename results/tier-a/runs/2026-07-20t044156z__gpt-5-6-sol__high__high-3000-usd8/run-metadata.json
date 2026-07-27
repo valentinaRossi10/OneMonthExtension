@@ -1,0 +1,76 @@
+{
+  "api_attempt_records": 32,
+  "approved_budget_usd": 8.0,
+  "created_at_utc": "2026-07-20T04:41:56.119436+00:00",
+  "differences_from_previous": [
+    {
+      "current": "tier-a-policy-v5",
+      "field": "policy_version",
+      "previous": "tier-a-policy-v4"
+    },
+    {
+      "current": 3000,
+      "field": "max_output_tokens",
+      "previous": 1900
+    },
+    {
+      "current": 8.0,
+      "field": "hard_budget_ceiling_usd",
+      "previous": 5.0
+    }
+  ],
+  "experiment_notes": [
+    "Uniform high-reasoning Tier A replacement run after the 1,900-token v4 run stopped on repeated incomplete output; use tier-a-policy-v5 with a 3,000-token output cap and hard USD 8 cumulative ceiling."
+  ],
+  "hard_budget_ceiling_usd": 8.0,
+  "input_price_per_million": 5.0,
+  "last_dry_run_at_utc": "2026-07-20T05:00:10.897869+00:00",
+  "last_projected_cumulative_cost_usd": 5.225135,
+  "manifest_summary": {
+    "estimated_worst_case_cost_usd": 6.7996,
+    "guarded_or_unavailable_tasks": 0,
+    "pricing_complete": true,
+    "ready_tasks": 60,
+    "tasks": 60
+  },
+  "max_output_tokens": 3000,
+  "metadata_version": "tier-a-run-v1",
+  "metrics": {
+    "balanced_accuracy": 0.23636363636363636,
+    "counts": {
+      "abstention": 3,
+      "false_negative": 1,
+      "false_positive": 7,
+      "invalid_output": 2,
+      "missing_output": 31,
+      "true_negative": 15,
+      "true_positive": 1
+    },
+    "decision_coverage": 0.4,
+    "end_to_end_recall": 0.2,
+    "end_to_end_specificity": 0.2727272727272727,
+    "expected_negatives": 55,
+    "expected_positives": 5,
+    "f1": 0.15384615384615385,
+    "false_positive_rate": 0.12727272727272726,
+    "observable_positive_recall": 0.25,
+    "precision": 0.125,
+    "strict_accuracy": 0.26666666666666666,
+    "tasks": 60
+  },
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "policy_version": "tier-a-policy-v5",
+  "prepared_at_utc": "2026-07-20T04:41:56.922359+00:00",
+  "previous_run_id": "2026-07-20t041125z__gpt-5-6-sol__high__compare-mixed-recovered",
+  "previous_run_path": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-a/runs/2026-07-20t041125z__gpt-5-6-sol__high__compare-mixed-recovered",
+  "prompt_version": "tier-a-prompt-v1",
+  "reasoning_effort": "high",
+  "recorded_cumulative_cost_usd": 1.40728,
+  "run_date_utc": "2026-07-20",
+  "run_id": "2026-07-20t044156z__gpt-5-6-sol__high__high-3000-usd8",
+  "schema_version": "tier-a-result-v1",
+  "scored_at_utc": "2026-07-20T05:01:54.352987+00:00",
+  "scored_tasks": 60,
+  "status": "scored"
+}
