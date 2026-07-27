@@ -1,0 +1,21 @@
+{
+  "analysis_artifact_md5": "073b82c6570bb6305e59a07b18167905",
+  "analysis_export_sha256": "192f843afef6104d153f2796879262ecae3126ca550448e89fe7749ae1cd423e",
+  "analysis_tool": "Ghidra",
+  "analysis_version": "12.1.2",
+  "artifact_path": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/binaries/tier-b/CVE-2017-15873-busybox/vulnerable",
+  "artifact_sha256": "881febe14700f18c03321f23fab65ebb6ad7614e1467c98049cf6db4308ebaae",
+  "callsite_count": 1887,
+  "callsites_index": "callsites.jsonl",
+  "callsites_sha256": "32a0de3e0a3efe6084fe95d191d6d27ccd4ae4f64ad8db5efbf6950e7dc279eb",
+  "corpus_root": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/binaries/tier-b/CVE-2017-15873-busybox/decompiled/vulnerable",
+  "corpus_sha256": "b8e8545a3c0543bbe02fc20af1f1edd56adb5a3ce81de32271ed8edc865e1fb0",
+  "created_at_utc": "2026-07-26T03:33:03.642852+00:00",
+  "function_count": 366,
+  "functions_index": "functions.jsonl",
+  "functions_sha256": "603d84dbfd161c591d53ed14bcc015bcdb1a9b12319f5e2e464a23a97161369f",
+  "package_id": "tier-b-filter-c",
+  "package_version": "tier-b-filter-package-v1",
+  "total_source_chars": 437519,
+  "unresolved_indirect_callsite_count": 17
+}

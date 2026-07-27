@@ -1,0 +1,26 @@
+{
+  "adaptive_projected_max_cost_usd": 20.10811,
+  "aggregate_hard_ceiling_usd": 20.14,
+  "base_projected_max_cost_usd": 12.64679,
+  "case_count": 2,
+  "comparison_source_manifest_sha256": "f9921d580cc4a36fc8a514b6aca8564a4e33d4698a7711b3c552f21615cbe251",
+  "comparison_source_run_id": "2026-07-26t084318z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v3-preflight-v2",
+  "ingestion_summary_sha256": "4e456bfc817eae963d3e384e60a13cf9b36a47e3d2c846a8150b005540b79365",
+  "manifest_sha256": "feef815a46b475fd3a2753629f8d497c84bb53d10a2a03a27349e283d1741503",
+  "package_count": 2,
+  "provider_api_calls_made_during_preparation": 0,
+  "quarantine_count": 0,
+  "queue_sha256": "88a9c842711a237db8a31669863e0e0441a3980141afe1f7b72b916d70340f4a",
+  "result_schema_sha256": "c87fb2421f88d32cd34c10474565ce6b382c6d558da1aa5152e2e3896fa70400",
+  "reviewed_scope_kind": "retry_only",
+  "reviewed_scope_sha256": "c74dc59550c729cbb0652d4963a1dd34103bc0a3dac58d872f6d664f875acb4b",
+  "reviewed_scope_version": "tier-b-filter-v3-terminal-response-retry-scope-v1",
+  "run_id": "2026-07-26t094749z__gpt-5.6-sol__medium__tier-a-mixed-recovered-two-case-terminal-response-retry-v3-observability-v1",
+  "selected_case_ids": [
+    "tier-b-case-599ba94926f0028709065453",
+    "tier-b-case-b99dc78d5275592661bdc5b9"
+  ],
+  "source_queue_case_count": 24,
+  "summary_version": "tier-b-filter-manifest-summary-v1",
+  "within_aggregate_ceiling": true
+}

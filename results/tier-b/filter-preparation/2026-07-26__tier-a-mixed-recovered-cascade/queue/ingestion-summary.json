@@ -1,0 +1,24 @@
+{
+  "bindings_file": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-b/filter-preparation/2026-07-26__tier-a-mixed-recovered-cascade/bindings.jsonl",
+  "coalesced_duplicate_row_count": 0,
+  "created_at_utc": "2026-07-26T04:32:03.158106+00:00",
+  "eligible_raw_row_count": 24,
+  "forward_verdicts": [
+    "indeterminate",
+    "vulnerable"
+  ],
+  "invariants": {
+    "artifact_scoped_uid_verified": true,
+    "every_eligible_row_mapped_once": true,
+    "one_function_uid_per_case": true,
+    "one_target_class_per_case": true
+  },
+  "mapped_raw_row_count": 24,
+  "output_case_count": 24,
+  "quarantine_count": 0,
+  "queue_version": "tier-b-filter-queue-v1",
+  "raw_row_count": 60,
+  "source_scoring_files": [
+    "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-a/runs/2026-07-18__gpt-5-6-sol__mixed-recovered/scoring/scoring.csv"
+  ]
+}

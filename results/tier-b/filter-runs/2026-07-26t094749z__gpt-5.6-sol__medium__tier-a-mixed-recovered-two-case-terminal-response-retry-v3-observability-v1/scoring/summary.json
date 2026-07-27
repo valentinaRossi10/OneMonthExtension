@@ -1,0 +1,37 @@
+{
+  "acceptance_target": {
+    "available_busybox_positive_cases": 5,
+    "limitation": "The asymmetric gate is designed to approach zero false suppressions on the reviewed cohort. An LLM-only gate cannot guarantee universal recall, universal absence of false suppression, or held-out generalization.",
+    "mathematical_guarantee": false,
+    "target_confirmation_count": 5,
+    "target_false_suppression_count": 0,
+    "target_kind": "observed_cohort_objective"
+  },
+  "accounted_spend_usd": 1.5413350000000001,
+  "category_counts": {
+    "unconfirmed_positive": 2
+  },
+  "confirmation_recall": 0.0,
+  "disposition_counts": {
+    "retain_and_escalate": 2
+  },
+  "execution_status_counts": {
+    "resource_exhausted": 2
+  },
+  "false_suppression_count": 0,
+  "labeled_negative_count": 0,
+  "labeled_positive_count": 2,
+  "manifest_case_count": 2,
+  "manifest_sha256": "feef815a46b475fd3a2753629f8d497c84bb53d10a2a03a27349e283d1741503",
+  "metadata_accounted_spend_usd": 1.5413350000000001,
+  "metadata_spend_matches_ledger": true,
+  "negative_suppression_rate": null,
+  "quarantine_count": 0,
+  "results_record_count": 50,
+  "results_sha256": "047e470331891f70b8e1e22b25abc1db59422b5c1a9f20e18971bacfd87719bf",
+  "retained_for_downstream_dynamic_analysis": 2,
+  "run_id": "2026-07-26t094749z__gpt-5.6-sol__medium__tier-a-mixed-recovered-two-case-terminal-response-retry-v3-observability-v1",
+  "scored_at_utc": "2026-07-26T09:55:55.490323+00:00",
+  "summary_version": "tier-b-filter-scoring-summary-v3",
+  "total_cases_including_quarantine": 2
+}

@@ -1,0 +1,37 @@
+{
+  "accounted_spend_usd": 3.366055,
+  "approved_budget_usd": 60.0,
+  "approved_manifest_sha256": "a088ed5d30f51a7c76f0585563b48f73f132a234f81b9b2bafe720fe59fe801c",
+  "created_at_utc": "2026-07-26T07:13:00.584884+00:00",
+  "experiment_notes": [
+    "Replacement six-case medium-reasoning cascade pilot under corrected tier-b-filter-result-v2 Structured Outputs schema.",
+    "Same reviewed selection as the failed schema-v1 run: four Tier A vulnerable-sourced cases and two indeterminate-sourced cases; four evaluator positives and two benchmark negatives.",
+    "Preparation only; no provider execution authorized."
+  ],
+  "experiment_version": "experiment-protocol-v6-mvp",
+  "input_price_per_million": 5.0,
+  "last_executed_at_utc": "2026-07-26T07:16:56.629095+00:00",
+  "manifest_sha256": "a088ed5d30f51a7c76f0585563b48f73f132a234f81b9b2bafe720fe59fe801c",
+  "metadata_version": "tier-b-filter-run-v1",
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "package_version": "tier-b-filter-package-v1",
+  "policy_version": "tier-b-filter-policy-v1",
+  "prompt_version": "tier-b-filter-prompt-v1",
+  "provider_api_calls_made": 73,
+  "queue_dir": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-b/filter-preparation/2026-07-26__tier-a-mixed-recovered-cascade/queue",
+  "queue_version": "tier-b-filter-queue-v1",
+  "reasoning_effort": "medium",
+  "run_id": "2026-07-26t071257z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v2",
+  "schema_version": "tier-b-filter-result-v2",
+  "selected_case_ids": [
+    "tier-b-case-2c9d598a0c5bd4a130256014",
+    "tier-b-case-599ba94926f0028709065453",
+    "tier-b-case-84084944b11533d3cc97e9e3",
+    "tier-b-case-b99dc78d5275592661bdc5b9",
+    "tier-b-case-ed8d3e93cf81e67af2b96876",
+    "tier-b-case-f9bab0a472e5f866be2c60c4"
+  ],
+  "source_queue_case_count": 24,
+  "status": "completed"
+}

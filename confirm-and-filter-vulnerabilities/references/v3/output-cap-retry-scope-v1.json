@@ -1,0 +1,27 @@
+{
+  "scope_version": "tier-b-filter-v3-output-cap-retry-scope-v1",
+  "scope_kind": "retry_only",
+  "parent_scope_version": "tier-b-filter-v3-six-case-comparison-scope-v1",
+  "parent_scope_sha256": "266edf12577896ffc6aa2568dc40ae88e27d77d48f1ba88b5f0a9f8518cae695",
+  "source_run_id": "2026-07-26t094749z__gpt-5.6-sol__medium__tier-a-mixed-recovered-two-case-terminal-response-retry-v3-observability-v1",
+  "source_manifest_sha256": "feef815a46b475fd3a2753629f8d497c84bb53d10a2a03a27349e283d1741503",
+  "source_results_sha256": "047e470331891f70b8e1e22b25abc1db59422b5c1a9f20e18971bacfd87719bf",
+  "required_prior_terminal_status": "provider_incomplete_max_output_tokens",
+  "required_prior_execution_status": "resource_exhausted",
+  "required_prior_stream_outcome": "incomplete_max_output_tokens",
+  "required_prior_incomplete_reason": "max_output_tokens",
+  "cases": [
+    {
+      "case_id": "tier-b-case-599ba94926f0028709065453",
+      "artifact_sha256": "881febe14700f18c03321f23fab65ebb6ad7614e1467c98049cf6db4308ebaae",
+      "function_uid": "fn-59a5d4c497d46b1c6f32949fea1141c2",
+      "target_class": "integer-overflow"
+    },
+    {
+      "case_id": "tier-b-case-b99dc78d5275592661bdc5b9",
+      "artifact_sha256": "e172b377acbad6bcb8f8a557ebb36437829bab6129c7ae657157c6030334d1ef",
+      "function_uid": "fn-351947f93ef25782a0478b27f1483228",
+      "target_class": "out-of-bounds-read"
+    }
+  ]
+}

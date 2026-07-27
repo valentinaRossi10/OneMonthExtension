@@ -1,0 +1,21 @@
+{
+  "analysis_artifact_md5": "c114530a03cadd2334ff5cdc08c85f29",
+  "analysis_export_sha256": "f5444e43b774738629c608b7e429627978b6cabc94e118dd2630212634ddbaa4",
+  "analysis_tool": "Ghidra",
+  "analysis_version": "12.1.2",
+  "artifact_path": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/binaries/tier-b/CVE-2021-42386-busybox/vulnerable",
+  "artifact_sha256": "6a467d8b6a0e6835dcf952319f30f917fc994e3832c2bc1c7a3c6343ef61bbf3",
+  "callsite_count": 1853,
+  "callsites_index": "callsites.jsonl",
+  "callsites_sha256": "6c40ba1295848b6dd6122127d2e10c93f1ce657a454ec95a85d5bbc207f821f9",
+  "corpus_root": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/binaries/tier-b/CVE-2021-42386-busybox/decompiled/vulnerable",
+  "corpus_sha256": "a4c944d29d9dba72c81c91b5ca20a221f97a833c8800bf062979f3f15cbed30b",
+  "created_at_utc": "2026-07-26T03:40:21.081890+00:00",
+  "function_count": 379,
+  "functions_index": "functions.jsonl",
+  "functions_sha256": "f737e0ef1329cac5a8f51f4cdb6c33c0ae40b4f18e9f17bc53c90ba713dc85f9",
+  "package_id": "tier-b-filter-i",
+  "package_version": "tier-b-filter-package-v1",
+  "total_source_chars": 444672,
+  "unresolved_indirect_callsite_count": 15
+}

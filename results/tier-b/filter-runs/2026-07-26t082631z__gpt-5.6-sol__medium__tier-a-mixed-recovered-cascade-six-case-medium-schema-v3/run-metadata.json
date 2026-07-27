@@ -1,0 +1,48 @@
+{
+  "accounted_spend_usd": 1.029455,
+  "approved_budget_usd": 60.42,
+  "approved_manifest_sha256": "d755900f72cc04c5e9e092e7a4b25cfa64c88e82052c4702beada6d5fda7380f",
+  "comparison_source_manifest_sha256": "a088ed5d30f51a7c76f0585563b48f73f132a234f81b9b2bafe720fe59fe801c",
+  "comparison_source_run_id": "2026-07-26t071257z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v2",
+  "created_at_utc": "2026-07-26T08:26:35.267104+00:00",
+  "decision_priority": {
+    "confirmation_has_full_adaptive_allowance_after_progress": true,
+    "confirmation_has_full_base_allowance": true,
+    "incomplete_suppression_disposition": "retain_and_escalate",
+    "primary_objective": "retain_confirmed",
+    "secondary_objective": "suppress_proven_false_positive",
+    "suppression_must_not_override_completed_confirmation": true
+  },
+  "experiment_notes": [
+    "Direct six-case v3 comparison against preserved schema-v2 pilot; no provider calls during preparation."
+  ],
+  "experiment_version": "experiment-protocol-v7-asymmetric-gate",
+  "input_price_per_million": 5.0,
+  "last_executed_at_utc": "2026-07-26T08:33:22.613014+00:00",
+  "manifest_sha256": "d755900f72cc04c5e9e092e7a4b25cfa64c88e82052c4702beada6d5fda7380f",
+  "metadata_version": "tier-b-filter-run-v1",
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "package_version": "tier-b-filter-package-v1",
+  "policy_version": "tier-b-filter-policy-v3",
+  "prompt_version": "tier-b-filter-prompt-v3",
+  "protocol_version": "v3",
+  "provider_api_calls_made": 6,
+  "queue_dir": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-b/filter-preparation/2026-07-26__tier-a-mixed-recovered-cascade/queue",
+  "queue_version": "tier-b-filter-queue-v1",
+  "reasoning_effort": "medium",
+  "reviewed_scope_sha256": "266edf12577896ffc6aa2568dc40ae88e27d77d48f1ba88b5f0a9f8518cae695",
+  "reviewed_scope_version": "tier-b-filter-v3-six-case-comparison-scope-v1",
+  "run_id": "2026-07-26t082631z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v3",
+  "schema_version": "tier-b-filter-result-v3",
+  "selected_case_ids": [
+    "tier-b-case-2c9d598a0c5bd4a130256014",
+    "tier-b-case-599ba94926f0028709065453",
+    "tier-b-case-84084944b11533d3cc97e9e3",
+    "tier-b-case-b99dc78d5275592661bdc5b9",
+    "tier-b-case-ed8d3e93cf81e67af2b96876",
+    "tier-b-case-f9bab0a472e5f866be2c60c4"
+  ],
+  "source_queue_case_count": 24,
+  "status": "completed"
+}

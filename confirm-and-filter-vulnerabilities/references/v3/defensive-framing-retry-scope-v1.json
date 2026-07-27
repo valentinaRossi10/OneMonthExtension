@@ -1,0 +1,21 @@
+{
+  "scope_version": "tier-b-filter-v3-defensive-framing-retry-scope-v1",
+  "scope_kind": "retry_only",
+  "parent_scope_version": "tier-b-filter-v3-six-case-comparison-scope-v1",
+  "parent_scope_sha256": "266edf12577896ffc6aa2568dc40ae88e27d77d48f1ba88b5f0a9f8518cae695",
+  "source_run_id": "2026-07-26t100925z__gpt-5.6-sol__medium__tier-a-mixed-recovered-two-case-output-cap-retry-v3-8192-v1",
+  "source_manifest_sha256": "526754505bd775d875d0d5ea079a68f6e6324a80463b601e14ff9f76060f8d06",
+  "source_results_sha256": "6e14e071de7c2c6f031b1788ef3454f9a73864f73fb2d208b89d8d4bc147b507",
+  "required_prior_terminal_status": "infrastructure_error",
+  "required_prior_execution_status": "infrastructure_error",
+  "required_prior_stream_outcome": "provider_failed",
+  "required_prior_error_contains": "cyber_policy",
+  "cases": [
+    {
+      "case_id": "tier-b-case-b99dc78d5275592661bdc5b9",
+      "artifact_sha256": "e172b377acbad6bcb8f8a557ebb36437829bab6129c7ae657157c6030334d1ef",
+      "function_uid": "fn-351947f93ef25782a0478b27f1483228",
+      "target_class": "out-of-bounds-read"
+    }
+  ]
+}

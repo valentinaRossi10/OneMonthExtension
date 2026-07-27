@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recall-first Tier B exact case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "queue_version",
+    "case_id",
+    "artifact_sha256",
+    "function_uid",
+    "target_class",
+    "package_path",
+    "entry_roots",
+    "source_row_count",
+    "source_rows",
+    "evidence_items",
+    "has_conflicting_verdicts"
+  ],
+  "properties": {
+    "queue_version": {"const": "tier-b-filter-queue-v1"},
+    "case_id": {"type": "string", "pattern": "^tier-b-case-[0-9a-f]{24}$"},
+    "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "function_uid": {"type": "string", "pattern": "^fn-[0-9a-f]{32}$"},
+    "target_class": {
+      "enum": [
+        "command-injection",
+        "heap-buffer-overflow",
+        "integer-overflow",
+        "null-pointer-dereference",
+        "out-of-bounds-read",
+        "use-after-free"
+      ]
+    },
+    "package_path": {"type": "string", "minLength": 1},
+    "entry_roots": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^fn-[0-9a-f]{32}$"},
+      "uniqueItems": true
+    },
+    "source_row_count": {"type": "integer", "minimum": 1},
+    "source_rows": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "evidence_items": {"type": "array", "items": {"type": "object"}},
+    "has_conflicting_verdicts": {"type": "boolean"}
+  }
+}

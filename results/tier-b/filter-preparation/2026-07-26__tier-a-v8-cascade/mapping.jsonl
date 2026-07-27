@@ -1,0 +1,9 @@
+{"candidate_address":"0010645f","cve_id":"CVE-2026-29004","entry_root_addresses":["00106de9"],"package_path":"results/tier-b/filter-packages/2026-07-26/tier-b-filter-a","variant":"vulnerable"}
+{"candidate_address":"0010645f","cve_id":"CVE-2026-29004","entry_root_addresses":["00106de9"],"package_path":"results/tier-b/filter-packages/2026-07-26/tier-b-filter-b","variant":"patched"}
+{"candidate_address":"00112b3f","cve_id":"CVE-2017-15873","entry_root_addresses":["001129f8"],"package_path":"results/tier-b/filter-packages/2026-07-26/tier-b-filter-c","variant":"vulnerable"}
+{"candidate_address":"00112b3f","cve_id":"CVE-2017-15873","entry_root_addresses":["001129f8"],"package_path":"results/tier-b/filter-packages/2026-07-26/tier-b-filter-d","variant":"patched"}
+{"candidate_address":"00105d3e","cve_id":"CVE-2021-42373","entry_root_addresses":["00105d3e"],"package_path":"results/tier-b/filter-packages/2026-07-26/tier-b-filter-e","variant":"vulnerable"}
+{"candidate_address":"00105d3e","cve_id":"CVE-2021-42373","entry_root_addresses":["00105d3e"],"package_path":"results/tier-b/filter-packages/2026-07-26/tier-b-filter-f","variant":"patched"}
+{"candidate_address":"001132be","cve_id":"CVE-2021-42374","entry_root_addresses":["001126ff"],"package_path":"results/tier-b/filter-packages/2026-07-26/tier-b-filter-g","variant":"vulnerable"}
+{"candidate_address":"001132be","cve_id":"CVE-2021-42374","entry_root_addresses":["001126ff"],"package_path":"results/tier-b/filter-packages/2026-07-26/tier-b-filter-h","variant":"patched"}
+{"candidate_address":"00113c0b","cve_id":"CVE-2021-42386","entry_root_addresses":["0011776e"],"package_path":"results/tier-b/filter-packages/2026-07-26/tier-b-filter-i","variant":"vulnerable"}

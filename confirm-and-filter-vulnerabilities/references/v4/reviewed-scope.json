@@ -1,0 +1,43 @@
+{
+  "scope_version": "tier-b-filter-v4-six-case-comparison-scope-v1",
+  "source_run_id": "2026-07-26t071257z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v2",
+  "source_manifest_sha256": "a088ed5d30f51a7c76f0585563b48f73f132a234f81b9b2bafe720fe59fe801c",
+  "cases": [
+    {
+      "case_id": "tier-b-case-2c9d598a0c5bd4a130256014",
+      "artifact_sha256": "460eaf71196ed67de2da19bb850795a2336de7a22b7c61f0f6a145269bd053ee",
+      "function_uid": "fn-01d80e7e92abf7fbb4e0a5ced6f4fc88",
+      "target_class": "heap-buffer-overflow"
+    },
+    {
+      "case_id": "tier-b-case-599ba94926f0028709065453",
+      "artifact_sha256": "881febe14700f18c03321f23fab65ebb6ad7614e1467c98049cf6db4308ebaae",
+      "function_uid": "fn-59a5d4c497d46b1c6f32949fea1141c2",
+      "target_class": "integer-overflow"
+    },
+    {
+      "case_id": "tier-b-case-84084944b11533d3cc97e9e3",
+      "artifact_sha256": "e580b62b0b25d33e79b2e14e91e036f0761eaf9e6bab5a22a15ad92ced75444c",
+      "function_uid": "fn-762f7374ced5d46c0f38519d5088219c",
+      "target_class": "null-pointer-dereference"
+    },
+    {
+      "case_id": "tier-b-case-b99dc78d5275592661bdc5b9",
+      "artifact_sha256": "e172b377acbad6bcb8f8a557ebb36437829bab6129c7ae657157c6030334d1ef",
+      "function_uid": "fn-351947f93ef25782a0478b27f1483228",
+      "target_class": "out-of-bounds-read"
+    },
+    {
+      "case_id": "tier-b-case-ed8d3e93cf81e67af2b96876",
+      "artifact_sha256": "4731b46743197ca18f173893e8766d3118979549c5d681f0e8be5389fe704eab",
+      "function_uid": "fn-34c0a50ef207bfdb8aeeb9b596ca5218",
+      "target_class": "integer-overflow"
+    },
+    {
+      "case_id": "tier-b-case-f9bab0a472e5f866be2c60c4",
+      "artifact_sha256": "d57672462e75e399d1caa63ed2216002bf85063eed9d5d7eea757a8a562d5bd3",
+      "function_uid": "fn-f7d7e3bb719bc06f56a0eb6dfe1f05ca",
+      "target_class": "null-pointer-dereference"
+    }
+  ]
+}

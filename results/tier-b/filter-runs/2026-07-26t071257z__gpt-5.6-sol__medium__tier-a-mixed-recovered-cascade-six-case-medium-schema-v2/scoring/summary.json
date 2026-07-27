@@ -1,0 +1,41 @@
+{
+  "acceptance_target": {
+    "available_busybox_positive_cases": 5,
+    "limitation": "Passing the five reviewed BusyBox positives does not establish universal recall or held-out generalization.",
+    "target_confirmation_count": 5,
+    "target_false_suppression_count": 0
+  },
+  "accounted_spend_usd": 3.366055,
+  "category_counts": {
+    "false_suppression": 1,
+    "surviving_negative": 1,
+    "true_negative": 1,
+    "true_positive": 1,
+    "unconfirmed_positive": 2
+  },
+  "confirmation_recall": 0.25,
+  "disposition_counts": {
+    "retain_and_escalate": 3,
+    "retain_confirmed": 1,
+    "suppress_proven_false_positive": 2
+  },
+  "execution_status_counts": {
+    "completed": 5,
+    "invalid_output": 1
+  },
+  "false_suppression_count": 1,
+  "labeled_negative_count": 2,
+  "labeled_positive_count": 4,
+  "manifest_case_count": 6,
+  "manifest_sha256": "a088ed5d30f51a7c76f0585563b48f73f132a234f81b9b2bafe720fe59fe801c",
+  "metadata_accounted_spend_usd": 3.366055,
+  "metadata_spend_matches_ledger": true,
+  "negative_suppression_rate": 0.5,
+  "quarantine_count": 0,
+  "results_record_count": 75,
+  "results_sha256": "c62054052f2b88d55c92b269f33799c77a815e056542693ad736809c5d450935",
+  "run_id": "2026-07-26t071257z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v2",
+  "scored_at_utc": "2026-07-26T07:30:42.219832+00:00",
+  "summary_version": "tier-b-filter-scoring-summary-v2",
+  "total_cases_including_quarantine": 6
+}

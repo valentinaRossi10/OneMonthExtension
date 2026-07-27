@@ -1,0 +1,21 @@
+{
+  "analysis_artifact_md5": "e1975328b377d7b59256704d5d92b529",
+  "analysis_export_sha256": "b8f3493026970c7ec979f5eeeea326667ffb905900b89142d824affdf7b210c1",
+  "analysis_tool": "Ghidra",
+  "analysis_version": "12.1.2",
+  "artifact_path": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/binaries/tier-b/CVE-2026-29004-busybox/patched",
+  "artifact_sha256": "c2b439dc13c2240558368221d592eb8fe5a84e957c54821fda8666152d7471c6",
+  "callsite_count": 2024,
+  "callsites_index": "callsites.jsonl",
+  "callsites_sha256": "94cab266e4b75d3132a495cef07c34107a4380b14fd26f63c56d56bddf44389c",
+  "corpus_root": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/binaries/tier-b/CVE-2026-29004-busybox/decompiled/patched",
+  "corpus_sha256": "c1db8d2e593b150802d7ef0701498eb8737e2cb60cb6316d3f3deee64948beb8",
+  "created_at_utc": "2026-07-26T03:19:28.905598+00:00",
+  "function_count": 397,
+  "functions_index": "functions.jsonl",
+  "functions_sha256": "bd34db7ef3c71dcc7786d4546103865d9813beb1926ac8bb5001b30e25272839",
+  "package_id": "tier-b-filter-b",
+  "package_version": "tier-b-filter-package-v1",
+  "total_source_chars": 478763,
+  "unresolved_indirect_callsite_count": 14
+}

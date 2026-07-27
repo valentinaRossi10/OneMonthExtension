@@ -1,0 +1,523 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recall-first Tier B filter result v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_class",
+    "semantic_status",
+    "pipeline_disposition",
+    "execution_status",
+    "candidate_identity",
+    "hypotheses",
+    "confirmation_obligations",
+    "adversarial_challenge",
+    "suppression_proof",
+    "reachability",
+    "evidence",
+    "blocking_controls",
+    "unresolved_facts",
+    "progress_events",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "tier-b-filter-result-v3"
+    },
+    "target_class": {
+      "type": "string",
+      "enum": [
+        "command-injection",
+        "heap-buffer-overflow",
+        "integer-overflow",
+        "null-pointer-dereference",
+        "out-of-bounds-read",
+        "use-after-free"
+      ]
+    },
+    "semantic_status": {
+      "type": "string",
+      "enum": ["confirmed", "safety_proven", "unresolved"]
+    },
+    "pipeline_disposition": {
+      "type": "string",
+      "enum": [
+        "retain_confirmed",
+        "suppress_proven_false_positive",
+        "retain_and_escalate"
+      ]
+    },
+    "execution_status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "provider_refusal",
+        "infrastructure_error",
+        "resource_exhausted",
+        "invalid_output"
+      ]
+    },
+    "candidate_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "function_uid", "artifact_sha256", "evidence"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["present", "absent", "ambiguous"]
+        },
+        "function_uid": {"type": "string"},
+        "artifact_sha256": {"type": "string"},
+        "evidence": {"type": "string", "minLength": 1, "maxLength": 2000}
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "target_class",
+          "hypothesis",
+          "result",
+          "evidence"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "target_class": {
+            "type": "string",
+            "enum": [
+              "command-injection",
+              "heap-buffer-overflow",
+              "integer-overflow",
+              "null-pointer-dereference",
+              "out-of-bounds-read",
+              "use-after-free"
+            ]
+          },
+          "hypothesis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "result": {
+            "type": "string",
+            "enum": ["supported", "contradicted", "unresolved"]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {"type": "string", "maxLength": 1000}
+          }
+        }
+      }
+    },
+    "confirmation_obligations": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "obligation_id",
+          "kind",
+          "obligation",
+          "completion",
+          "evidence"
+        ],
+        "properties": {
+          "obligation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "identity",
+              "reachability",
+              "target_operation",
+              "feasible_value_or_lifetime_constraints",
+              "contextual_path",
+              "class_specific",
+              "other"
+            ]
+          },
+          "obligation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "completion": {
+            "type": "string",
+            "enum": ["satisfied", "unsatisfied", "unresolved"]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {"type": "string", "maxLength": 1000}
+          }
+        }
+      }
+    },
+    "adversarial_challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicability",
+        "hypothesis_id",
+        "challenge",
+        "outcome",
+        "evidence"
+      ],
+      "properties": {
+        "applicability": {
+          "type": "string",
+          "enum": ["required", "not_applicable"]
+        },
+        "hypothesis_id": {"type": "string", "maxLength": 64},
+        "challenge": {"type": "string", "maxLength": 1000},
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "confirmation_survives",
+            "confirmation_defeated",
+            "unresolved",
+            "not_applicable"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 1000}
+        }
+      }
+    },
+    "suppression_proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim",
+        "completion",
+        "hypothesis_coverage",
+        "sink_inventory",
+        "unresolved_items"
+      ],
+      "properties": {
+        "claim": {
+          "type": "string",
+          "enum": [
+            "not_claimed",
+            "candidate_absent",
+            "unreachable",
+            "all_relevant_hypotheses_contradicted"
+          ]
+        },
+        "completion": {
+          "type": "string",
+          "enum": ["satisfied", "unsatisfied", "unresolved"]
+        },
+        "hypothesis_coverage": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 64}
+        },
+        "sink_inventory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["completion", "enumeration_evidence", "sinks"],
+          "properties": {
+            "completion": {
+              "type": "string",
+              "enum": ["satisfied", "unsatisfied", "unresolved"]
+            },
+            "enumeration_evidence": {
+              "type": "array",
+              "items": {"type": "string", "maxLength": 1000}
+            },
+            "sinks": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "sink_id",
+                  "function_uid",
+                  "line",
+                  "operation",
+                  "conclusion",
+                  "origin",
+                  "transformations",
+                  "guard",
+                  "invariant_dependencies"
+                ],
+                "properties": {
+                  "sink_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "function_uid": {"type": "string", "minLength": 1},
+                  "line": {"type": "integer", "minimum": 1},
+                  "operation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "conclusion": {
+                    "type": "string",
+                    "enum": ["safe", "unsafe", "unresolved"]
+                  },
+                  "origin": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["description", "evidence"],
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "evidence": {
+                        "type": "array",
+                        "items": {"type": "string", "maxLength": 1000}
+                      }
+                    }
+                  },
+                  "transformations": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "order",
+                        "function_uid",
+                        "line",
+                        "operation",
+                        "effect",
+                        "invariant_ids",
+                        "evidence"
+                      ],
+                      "properties": {
+                        "order": {"type": "integer", "minimum": 1},
+                        "function_uid": {"type": "string", "minLength": 1},
+                        "line": {"type": "integer", "minimum": 1},
+                        "operation": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "effect": {
+                          "type": "string",
+                          "enum": [
+                            "preserves_value_and_state",
+                            "changes_value_preserves_proven_invariant",
+                            "changes_value_and_requires_recheck",
+                            "reestablishes_guarded_invariant",
+                            "invalidates_guarded_invariant",
+                            "unresolved"
+                          ]
+                        },
+                        "invariant_ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "items": {"type": "string", "maxLength": 1000}
+                        }
+                      }
+                    }
+                  },
+                  "guard": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "position",
+                      "function_uid",
+                      "line",
+                      "after_transformation_order",
+                      "value_relation",
+                      "evidence"
+                    ],
+                    "properties": {
+                      "position": {
+                        "type": "string",
+                        "enum": [
+                          "post_last_transformation",
+                          "earlier_with_complete_preservation_proof",
+                          "missing",
+                          "unresolved"
+                        ]
+                      },
+                      "function_uid": {"type": "string", "minLength": 1},
+                      "line": {"type": "integer", "minimum": 1},
+                      "after_transformation_order": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "value_relation": {
+                        "type": "string",
+                        "enum": [
+                          "exact_same_value_state",
+                          "explicitly_proven_equivalent",
+                          "different_value_or_state",
+                          "unresolved"
+                        ]
+                      },
+                      "evidence": {
+                        "type": "array",
+                        "items": {"type": "string", "maxLength": 1000}
+                      }
+                    }
+                  },
+                  "invariant_dependencies": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "invariant_id",
+                        "invariant",
+                        "established_function_uid",
+                        "established_line",
+                        "used_at_sink_id",
+                        "intervening_mutations",
+                        "conclusion",
+                        "evidence"
+                      ],
+                      "properties": {
+                        "invariant_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "invariant": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        },
+                        "established_function_uid": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "established_line": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "used_at_sink_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "intervening_mutations": {
+                          "type": "array",
+                          "maxItems": 128,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "order",
+                              "function_uid",
+                              "line",
+                              "mutation",
+                              "preservation",
+                              "evidence"
+                            ],
+                            "properties": {
+                              "order": {"type": "integer", "minimum": 1},
+                              "function_uid": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "line": {"type": "integer", "minimum": 1},
+                              "mutation": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "preservation": {
+                                "type": "string",
+                                "enum": [
+                                  "preserved",
+                                  "invalidated",
+                                  "unresolved"
+                                ]
+                              },
+                              "evidence": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "maxLength": 1000
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "conclusion": {
+                          "type": "string",
+                          "enum": ["preserved", "invalidated", "unresolved"]
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "items": {"type": "string", "maxLength": 1000}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "unresolved_items": {
+          "type": "array",
+          "items": {"type": "string", "maxLength": 1000}
+        }
+      }
+    },
+    "reachability": {
+      "type": "string",
+      "enum": ["reachable", "unreachable", "unresolved"]
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["function_uid", "line", "claim"],
+        "properties": {
+          "function_uid": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "claim": {"type": "string", "minLength": 1, "maxLength": 1000}
+        }
+      }
+    },
+    "blocking_controls": {
+      "type": "array",
+      "items": {"type": "string", "maxLength": 1000}
+    },
+    "unresolved_facts": {
+      "type": "array",
+      "items": {"type": "string", "maxLength": 1000}
+    },
+    "progress_events": {
+      "type": "array",
+      "items": {"type": "string", "maxLength": 1000}
+    },
+    "summary": {"type": "string", "minLength": 1, "maxLength": 4000}
+  }
+}

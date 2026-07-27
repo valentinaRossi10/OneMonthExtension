@@ -1,0 +1,48 @@
+{
+  "accounted_spend_usd": 4.171894999999999,
+  "approved_budget_usd": 28.92,
+  "approved_manifest_sha256": "526754505bd775d875d0d5ea079a68f6e6324a80463b601e14ff9f76060f8d06",
+  "comparison_source_manifest_sha256": "feef815a46b475fd3a2753629f8d497c84bb53d10a2a03a27349e283d1741503",
+  "comparison_source_run_id": "2026-07-26t094749z__gpt-5.6-sol__medium__tier-a-mixed-recovered-two-case-terminal-response-retry-v3-observability-v1",
+  "created_at_utc": "2026-07-26T10:09:27.622643+00:00",
+  "decision_priority": {
+    "confirmation_has_full_adaptive_allowance_after_progress": true,
+    "confirmation_has_full_base_allowance": true,
+    "incomplete_suppression_disposition": "retain_and_escalate",
+    "primary_objective": "retain_confirmed",
+    "secondary_objective": "suppress_proven_false_positive",
+    "suppression_must_not_override_completed_confirmation": true
+  },
+  "experiment_notes": [
+    "Exact two-case retry after measured response.incomplete:max_output_tokens at the 4500-token cap; cap raised to 8192 without changing protocol v3, reasoning, call/tool allowances, packages, prompts, or confirmation-priority policy. Preparation only; no provider API calls."
+  ],
+  "experiment_version": "experiment-protocol-v7-asymmetric-gate",
+  "input_price_per_million": 5.0,
+  "last_executed_at_utc": "2026-07-26T10:13:58.579017+00:00",
+  "manifest_sha256": "526754505bd775d875d0d5ea079a68f6e6324a80463b601e14ff9f76060f8d06",
+  "metadata_version": "tier-b-filter-run-v1",
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "package_version": "tier-b-filter-package-v1",
+  "policy_version": "tier-b-filter-policy-v3-output-cap-8192-v1",
+  "prompt_version": "tier-b-filter-prompt-v3",
+  "protocol_version": "v3",
+  "provider_api_calls_made": 31,
+  "provider_generation_calls_made": 30,
+  "provider_retrieval_calls_made": 1,
+  "queue_dir": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-b/filter-preparation/2026-07-26__tier-a-mixed-recovered-cascade/queue",
+  "queue_version": "tier-b-filter-queue-v1",
+  "reasoning_effort": "medium",
+  "result_schema_sha256": "c87fb2421f88d32cd34c10474565ce6b382c6d558da1aa5152e2e3896fa70400",
+  "reviewed_scope_kind": "retry_only",
+  "reviewed_scope_sha256": "a6f52d9f3044074676386e22ecfa4a1ce8b8d7567ae8fcc65df9b775fbfc189c",
+  "reviewed_scope_version": "tier-b-filter-v3-output-cap-retry-scope-v1",
+  "run_id": "2026-07-26t100925z__gpt-5.6-sol__medium__tier-a-mixed-recovered-two-case-output-cap-retry-v3-8192-v1",
+  "schema_version": "tier-b-filter-result-v3",
+  "selected_case_ids": [
+    "tier-b-case-599ba94926f0028709065453",
+    "tier-b-case-b99dc78d5275592661bdc5b9"
+  ],
+  "source_queue_case_count": 24,
+  "status": "completed"
+}

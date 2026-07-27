@@ -1,0 +1,15 @@
+{
+  "adaptive_projected_max_cost_usd": 233.29882,
+  "aggregate_hard_ceiling_usd": 240.0,
+  "base_projected_max_cost_usd": 145.64498,
+  "case_count": 24,
+  "ingestion_summary_sha256": "4e456bfc817eae963d3e384e60a13cf9b36a47e3d2c846a8150b005540b79365",
+  "manifest_sha256": "37f97586561cf8431958b87327c5af8dcee3e2f0ee00b78a2087bb73c727a178",
+  "package_count": 9,
+  "provider_api_calls_made_during_preparation": 0,
+  "quarantine_count": 0,
+  "queue_sha256": "88a9c842711a237db8a31669863e0e0441a3980141afe1f7b72b916d70340f4a",
+  "run_id": "2026-07-26t045326z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-filter-medium-v1",
+  "summary_version": "tier-b-filter-manifest-summary-v1",
+  "within_aggregate_ceiling": true
+}

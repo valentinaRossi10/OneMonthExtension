@@ -1,0 +1,4 @@
+interface:
+  display_name: "Confirm and Filter Vulnerabilities"
+  short_description: "Recall-first Tier B candidate filtering"
+  default_prompt: "Use $confirm-and-filter-vulnerabilities to ingest Tier A candidates, confirm true vulnerabilities, and suppress only proven false positives."

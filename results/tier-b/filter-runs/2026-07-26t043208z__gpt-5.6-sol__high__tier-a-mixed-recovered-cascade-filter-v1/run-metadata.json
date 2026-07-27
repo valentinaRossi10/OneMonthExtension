@@ -1,0 +1,23 @@
+{
+  "accounted_spend_usd": 0.0,
+  "created_at_utc": "2026-07-26T04:32:17.014859+00:00",
+  "experiment_notes": [
+    "Recall-first Tier B cascade prepared from the frozen mixed/mostly-low recovered Tier A baseline; no API execution authorized."
+  ],
+  "experiment_version": "experiment-protocol-v6-mvp",
+  "input_price_per_million": 5.0,
+  "manifest_sha256": "bdf024ed7c3b0d743c1407f4e0a948f94dd76d27d6ee10faa44ea8144cc03dd9",
+  "metadata_version": "tier-b-filter-run-v1",
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "package_version": "tier-b-filter-package-v1",
+  "policy_version": "tier-b-filter-policy-v1",
+  "prompt_version": "tier-b-filter-prompt-v1",
+  "provider_api_calls_made": 0,
+  "queue_dir": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-b/filter-preparation/2026-07-26__tier-a-mixed-recovered-cascade/queue",
+  "queue_version": "tier-b-filter-queue-v1",
+  "reasoning_effort": "high",
+  "run_id": "2026-07-26t043208z__gpt-5.6-sol__high__tier-a-mixed-recovered-cascade-filter-v1",
+  "schema_version": "tier-b-filter-result-v1",
+  "status": "prepared_not_executed"
+}

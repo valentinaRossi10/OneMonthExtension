@@ -1,0 +1,46 @@
+{
+  "artifact_version": "tier-b-discarded-interim-reconciliation-v1",
+  "artifact_mode": "append_only_sidecar",
+  "created_at_utc": "2026-07-27T01:44:10Z",
+  "run_id": "2026-07-26t084318z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v3-preflight-v2",
+  "original_artifacts_unchanged": true,
+  "original_manifest_sha256": "f9921d580cc4a36fc8a514b6aca8564a4e33d4698a7711b3c552f21615cbe251",
+  "original_results_sha256": "4658956aca61134db7faa520b226ec486ef1abe5817e6a5c6ed7fe63767795a7",
+  "original_scoring_summary_sha256": "b8947f58b6cfc10525fd461181e296f82804142446f1dd7132344c499794d7e3",
+  "original_accounted_spend_usd": 6.655415,
+  "reconciled_accounted_spend_usd": 8.25774,
+  "accounting_note": "Call-13 usage was not preserved. The correction applies the frozen manifest's conservative call-13 reservation, not an invented actual usage value.",
+  "semantic_note": "Every discarded result entered the continuation branch only after a validated retain_and_escalate disposition. Semantic categories remain unresolved abstentions; no confirmation or suppression is introduced.",
+  "correction_records": [
+    {
+      "case_id": "tier-b-case-b99dc78d5275592661bdc5b9",
+      "model_call_index": 13,
+      "evidence": "The provider-call sequence skips outcome 13 and resumes at the recorded adaptive extension on call 14. This continuation is reachable only after a schema-valid retain_and_escalate result.",
+      "original_terminal_status": "infrastructure_error",
+      "original_execution_status": "infrastructure_error",
+      "corrected_execution_status": "completed",
+      "semantic_status": "unresolved",
+      "pipeline_disposition": "retain_and_escalate",
+      "semantic_category_changed": false,
+      "accounting_basis": "conservative_frozen_projection",
+      "reserved_input_tokens": 133307,
+      "reserved_output_tokens": 4500,
+      "added_accounted_cost_usd": 0.801535
+    },
+    {
+      "case_id": "tier-b-case-f9bab0a472e5f866be2c60c4",
+      "model_call_index": 13,
+      "evidence": "The provider-call sequence skips outcome 13 and resumes at the recorded adaptive extension on call 14. This continuation is reachable only after a schema-valid retain_and_escalate result.",
+      "original_terminal_status": "ok",
+      "original_execution_status": "completed",
+      "corrected_execution_status": "completed",
+      "semantic_status": "unresolved",
+      "pipeline_disposition": "retain_and_escalate",
+      "semantic_category_changed": false,
+      "accounting_basis": "conservative_frozen_projection",
+      "reserved_input_tokens": 133158,
+      "reserved_output_tokens": 4500,
+      "added_accounted_cost_usd": 0.80079
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "accounted_spend_usd": 0.0,
+  "created_at_utc": "2026-07-26T03:42:28.323060+00:00",
+  "experiment_notes": [
+    "Single-run protocol-v6 recall-first cascade preparation from frozen Tier A policy-v8 high-reasoning run; no provider calls and no execution approval."
+  ],
+  "experiment_version": "experiment-protocol-v6-mvp",
+  "input_price_per_million": 5.0,
+  "manifest_sha256": "b72bf9150b07c9e2d614d481df90701a66a0fd21f761fbec7c72d052a198b56d",
+  "metadata_version": "tier-b-filter-run-v1",
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "package_version": "tier-b-filter-package-v1",
+  "policy_version": "tier-b-filter-policy-v1",
+  "prompt_version": "tier-b-filter-prompt-v1",
+  "provider_api_calls_made": 0,
+  "queue_dir": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-b/filter-preparation/2026-07-26__tier-a-v8-cascade/queue",
+  "queue_version": "tier-b-filter-queue-v1",
+  "reasoning_effort": "high",
+  "run_id": "2026-07-26t034222z__gpt-5.6-sol__high__tier-a-v8-cascade-filter-v1",
+  "schema_version": "tier-b-filter-result-v1",
+  "status": "prepared_not_executed"
+}
