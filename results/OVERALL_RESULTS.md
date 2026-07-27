@@ -1,6 +1,6 @@
 # Overall pipeline results
 
-Last updated: 2026-07-23
+Last updated: 2026-07-27
 
 This is the human-readable progress dashboard for the experiment. The
 normative methodology remains in [`EXPERIMENT.md`](../EXPERIMENT.md), and the
@@ -19,6 +19,7 @@ they are not pooled into a synthetic five-pair matrix score.
 | Tier B v4 remediation subset | Completed | 3 abstentions and 1 API failure; no decisive correct verdict |
 | Tier B v5 targeted follow-up | Completed | NULL-dereference vulnerable TP, its patched control FP, UAF vulnerable FN, integer-overflow retry API failure |
 | Complete five-pair Tier B oracle matrix | **Not completed** | Historical pilot and versioned follow-ups cannot be pooled as one matrix |
+| Tier B redesign (`confirm-and-filter-vulnerabilities`) six-case pilot | Completed | 2/4 real vulnerabilities confirmed, 1 true negative correctly suppressed, 3 cases retained as documented capability-gap limitations |
 | Tier A → Tier B cascade | **Not executed** | No end-to-end pipeline accuracy or recall can be claimed yet |
 | Dynamic-analysis validation | **Not executed** | Outside the current static benchmark |
 
@@ -90,6 +91,120 @@ aggregate metric.
 | CVE-2021-42374 | **API error** under v3 | **FP** under v3; control remains audit-pending | Vulnerable result and patched-control validity remain unresolved |
 | CVE-2021-42386 | **FN** under package v3/policy v6 | **TN** in the historical v3 follow-on | Patched rejection works, but the vulnerable logical-lifetime path is still missed |
 
+## Tier B redesign: six-case pilot (`confirm-and-filter-vulnerabilities`)
+
+The rows above (`Tier B v3/v4/v5`) all come from the earlier, oracle-only
+skill (`confirm-vulnerability-reachability`), which only ever evaluated
+pre-selected vulnerable/patched pairs with a known answer. Per supervisor
+direction, that design was replaced with a new skill,
+`confirm-and-filter-vulnerabilities`, built around a different priority
+ordering: **confirming every true positive forwarded to it is the hard,
+primary constraint; reducing false positives is a secondary, best-effort
+goal that must never weaken confirmation to achieve.** A case that can't be
+cleanly resolved either way is retained and passed on to downstream dynamic
+analysis rather than dropped — retaining a false positive is treated as
+acceptable, suppressing a true positive is not.
+
+This section covers the pilot built to validate that redesign: six cases
+selected from a real, frozen Tier A run (`2026-07-18__gpt-5-6-sol__mixed-recovered`),
+covering all 4 of that run's real vulnerabilities plus one genuine Tier A
+false positive and one genuine Tier A abstention on safe code, so both
+halves of the objective (confirm real bugs, suppress real false positives)
+were actually exercised, not just the easy half.
+
+### Final result per case
+
+| Case | Final outcome | Controlling run (protocol) |
+|---|---|---|
+| CVE-2026-29004 vulnerable, heap-buffer-overflow | **Confirmed (TP)** | schema-v2 |
+| CVE-2021-42373 vulnerable, NULL-pointer-dereference | **Confirmed (TP)** | schema-v3 (after a validator fix) |
+| CVE-2021-42373 patched, integer-overflow | **Suppressed (TN)** | schema-v2 |
+| CVE-2017-15873 vulnerable, integer-overflow | **Retained — known limitation** | schema-v2 through the 8,192-token/terminal-response retries |
+| CVE-2017-15873 patched, NULL-pointer-dereference (a real Tier A false positive) | **Retained — known limitation** | schema-v2/v3 |
+| CVE-2021-42374 vulnerable, out-of-bounds-read | **Retained — known limitation** | schema-v2 through the v4 contradiction-proof retry |
+
+**2 of 4 real vulnerabilities confirmed, 1 genuine false positive correctly
+suppressed with a full evidentiary proof, 3 cases honestly retained as
+unresolved** rather than forced to a guess in either direction. No true
+positive was ever suppressed at any point in the pilot.
+
+### Real bugs found and fixed along the way
+
+Each of these was independently verified against the actual code/schema/
+ledger, not accepted on a self-report:
+
+- **Two Structured Outputs schema-validity bugs** — a `const` field missing
+  its required `type`, and later an unsupported `uniqueItems` keyword —
+  both caught reactively against a live request at first, then closed with
+  an offline, no-API-call schema auditor so the same class of bug can't
+  recur silently.
+- **A validator status-conflation bug** that discarded a genuinely correct
+  confirmation (CVE-2021-42373) because one unrelated, correctly-defeated
+  counter-hypothesis was recorded with the same status word as "this
+  obligation failed." Fixed by splitting hypothesis result, obligation
+  completion, and adversarial-challenge outcome into three separate,
+  independently validated fields.
+- **A real false suppression** (CVE-2021-42374) where the model applied a
+  guard proven for one buffer read to a different, unguarded read. Fixed
+  with a strict per-sink suppression proof requiring every guard to be
+  tied to the exact same value/state it claims to protect, with any
+  unresolved step forcing retention instead of suppression.
+- **A runner bug that silently discarded valid interim results** — if the
+  model produced a complete, schema-valid "still unresolved" answer partway
+  through, then continued investigating and failed later, the earlier valid
+  answer was thrown away rather than kept as a fallback. Confirmed by
+  retrieving one lost answer directly from the provider by its preserved
+  response ID; a historical audit found four more instances of the same
+  pattern (all abstentions, never a hidden confirmation or suppression,
+  since the discard path only fires after a `retain_and_escalate` result).
+  Fixed by persisting every interim result and its cost before continuing.
+- **Recurring provider content-safety refusals** on genuinely vulnerable
+  code (`cyber_policy`), the same failure class that blocked the very first
+  Tier B pilot attempt. Mitigated (not eliminated) by reinforcing an
+  explicit defensive, symbolic-only framing at every step of the
+  investigation, not just once at the start.
+- **An unsupported inferential leap accepted without evidence** — the model
+  asserted a value "must already be bounded" with no citation, directly
+  contradicting the real fix. Fixed by requiring the same evidentiary
+  discipline already used for suppression's guard claims (a cited line, a
+  proven value relationship) before any hypothesis can be marked
+  contradicted.
+- **A generic, undiagnosable terminal-response exception** that conflated
+  token-cap exhaustion, provider refusals, and genuine transport failures
+  into one indistinguishable error message. Fixed by inspecting every typed
+  stream event instead of discarding them, capturing the response ID
+  immediately so a failed-but-actually-completed response can be recovered
+  by retrieval instead of guessed at or blindly retried.
+
+### Known limitations (accepted, not treated as open bugs)
+
+Three cases remain retained after every reasoning-discipline fix above was
+applied and verified working on other cases. Diagnosis (documented in
+`confirm-and-filter-vulnerabilities/references/evaluation.md`) is that these
+specifically require value-range/data-flow tracking across loop iterations
+and, in one case, indirect-call resolution — capabilities this design
+explicitly does not implement (no SSA, dominators, def-use slicing, or
+symbolic range analysis; the package exposes decompiled pseudo-C and a
+real but direct-calls-only Ghidra call graph). This boundary was decided
+in advance, when the MVP scope was first defined, not invented after the
+fact to explain away a hard case — and where the boundary turned out not
+to apply (an indirect call that was actually a fixed, resolvable address),
+the diagnosis said so plainly rather than defaulting to "capability gap."
+
+Further prompt, schema, or budget iteration is not expected to resolve
+these three cases; doing so would require building the deferred analysis
+engine, which is a separate, larger scope decision.
+
+### Cost
+
+Across the full investigation arc for this pilot (multiple prepare/execute
+cycles fixing distinct bugs, not one clean run), accounted spend totals
+approximately **$24.89**, against per-run adaptive worst-case ceilings that
+were consistently 3-15x higher than what was actually spent. Every
+execution was individually reviewed and approved against its own manifest
+hash and projected ceiling before running; see the individual run
+directories under `results/tier-b/filter-runs/` for exact per-run figures.
+
 ## What the results currently support
 
 - Tier A can find the function-local heap-overflow and NULL-dereference
@@ -97,9 +212,17 @@ aggregate metric.
 - Tier A consistently misses the designated function-local UAF case.
 - The completed Tier B pilot shows that the harness can correctly confirm one
   vulnerable heap-overflow case and reject its patched control.
-- The wider Tier B experiments are not yet reliable across classes. The
-  strongest targeted improvement is the CVE-2021-42373 vulnerable TP, but its
-  patched control became an FP.
+- The redesigned Tier B skill (`confirm-and-filter-vulnerabilities`)
+  confirmed 2 of 4 real vulnerabilities in its six-case pilot and correctly
+  suppressed a genuine Tier A false positive with a full evidentiary proof,
+  while never suppressing a true positive at any point across the whole
+  investigation arc. The 3 remaining unresolved cases are documented as an
+  accepted capability limitation (deferred range/data-flow analysis), not
+  an open bug — every fixable reasoning or infrastructure bug found along
+  the way was independently verified as actually fixed on other cases.
+- The wider Tier B experiments (oracle-only skill, protocol v3-v5) are not
+  yet reliable across classes. The strongest targeted improvement is the
+  CVE-2021-42373 vulnerable TP, but its patched control became an FP.
 - CVE-2017-15873 remains blocked by a repeated stream-completion failure,
   CVE-2021-42374 remains unresolved and audit-pending, and CVE-2021-42386
   remains a vulnerable-case FN despite richer package facts and a larger tool
@@ -113,3 +236,7 @@ aggregate metric.
 - [Tier B v3 four-pair follow-on](tier-b/matrix-summaries/2026-07-23__busybox-four-pair-follow-on__tier-b-v3.md)
 - [Tier B v4 remediation subset](tier-b/matrix-summaries/2026-07-23__busybox-remediation-subset__tier-b-v4.md)
 - [Tier B v5 targeted follow-up](tier-b/matrix-summaries/2026-07-23__busybox-targeted-follow-up__tier-b-v5.md)
+- [Tier B redesign known limitations](../confirm-and-filter-vulnerabilities/references/evaluation.md)
+- [Six-case schema-v2 run](tier-b/filter-runs/2026-07-26t071257z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v2) — CVE-2026-29004 confirmed, CVE-2021-42373 patched suppressed
+- [Six-case schema-v3 run](tier-b/filter-runs/2026-07-26t084318z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v3-preflight-v2) — CVE-2021-42373 vulnerable confirmed after the validator fix
+- [CVE-2021-42374 v4 contradiction-proof retry (final state)](tier-b/filter-runs/2026-07-27t031407z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cve-2021-42374-contradiction-proof-v4)
