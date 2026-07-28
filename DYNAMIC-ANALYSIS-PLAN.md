@@ -58,7 +58,7 @@ add real integration cost for zero corresponding benefit here.
 |---|---|---|---|
 | CVE-2026-29004 (udhcpc6) | `fill_envp`/`option_to_env` are `static` | Small patch — harness appended to the same translation unit, so `static` never actually needs to change | **Built, crash-repro verified** — `dynamic-analysis/cve-2026-29004/` |
 | CVE-2017-15873 (bunzip2) | `start_bunzip`/`read_bunzip`/`unpack_bz2_stream` already exported (`FAST_FUNC`), fd-based | None needed, confirmed | **Built, no source patch** — `dynamic-analysis/cve-2017-15873/`; crash not yet reproduced (needs a guided/longer campaign — the bug is inside Huffman-coded run lengths, not hand-craftable like CVE-2026-29004's fixed-offset field) |
-| CVE-2021-42374 (unlzma) | `unpack_lzma_stream` already exported (`FAST_FUNC`), fd-based | None expected | Not started |
+| CVE-2021-42374 (unlzma) | `unpack_lzma_stream` already exported (`FAST_FUNC`), fd-based | None needed, confirmed | **Built, crash found and confirmed** — `dynamic-analysis/cve-2021-42374/`; AFL++ found the OOB read autonomously in the same 4-minute calibration window, cross-checked absent on the patched source |
 | CVE-2021-42373 (man) | `man_main` itself is the entry point, already externally visible | None for linkage; needs AFL's argv-fuzzing mode instead of byte-buffer, and an unverified filesystem/env-var dependency (`/etc/man*.conf`, `MANDATORY_MANPATH`) needs checking | Not started |
 | CVE-2021-42386 (awk) | `nvalloc` is `static`, but `awk_main` (self-contained, externally visible) is the natural entry point | None expected at the entry level; needs both argv and file-content fuzzing (script + input text) | Not started |
 
