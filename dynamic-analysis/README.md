@@ -19,7 +19,7 @@ One subdirectory per ground-truth case, each containing:
 
 | Case | Harness | Verified crash repro | Calibration run |
 |---|---|---|---|
-| CVE-2026-29004 (udhcpc6) | done | yes (hand-crafted seed) | yes (60s, no false positives) |
+| CVE-2026-29004 (udhcpc6) | done | **yes — via real blind-seeded exploration** (~19 min, 7/7 crashes cross-checked as fix-specific true positives; supersedes the earlier hand-crafted-seed confirmation). See `CAMPAIGN-RESULTS.md` | yes (60s, no false positives) |
 | CVE-2017-15873 (bunzip2) | done | not yet — needs a longer/guided campaign, not a hand-craftable trigger | yes (4 min, 80.42% coverage, 0 crashes, no false positives) |
 | CVE-2021-42374 (unlzma) | done | **yes — found autonomously** by AFL++ (SEGV, wild pointer read); cross-checked absent on patched source | yes (4 min, 83.50% coverage, 1 crash) |
 | CVE-2021-42373 (man) | done | yes (hand-crafted argv, first try — NULL deref); cross-checked absent on patched source | yes (60s, 14,813 execs, 2 crashes, re-verified after linker-stub fix) |
