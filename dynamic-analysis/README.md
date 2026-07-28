@@ -19,8 +19,8 @@ One subdirectory per ground-truth case, each containing:
 
 | Case | Harness | Verified crash repro | Calibration run |
 |---|---|---|---|
-| CVE-2026-29004 (udhcpc6) | done | yes | yes (60s, no false positives) |
-| CVE-2017-15873 (bunzip2) | not started | — | — |
+| CVE-2026-29004 (udhcpc6) | done | yes (hand-crafted seed) | yes (60s, no false positives) |
+| CVE-2017-15873 (bunzip2) | done | not yet — needs a longer/guided campaign, not a hand-craftable trigger | yes (4 min, 80.42% coverage, 0 crashes, no false positives) |
 | CVE-2021-42374 (unlzma) | not started | — | — |
 | CVE-2021-42373 (man) | not started | — | — |
 | CVE-2021-42386 (awk) | not started | — | — |
