@@ -21,7 +21,7 @@ they are not pooled into a synthetic five-pair matrix score.
 | Complete five-pair Tier B oracle matrix | **Not completed** | Historical pilot and versioned follow-ups cannot be pooled as one matrix |
 | Tier B redesign (`confirm-and-filter-vulnerabilities`) six-case pilot | Completed | 2/4 real vulnerabilities confirmed, 1 true negative correctly suppressed, 3 cases retained as documented capability-gap limitations |
 | Tier A → Tier B cascade | **Not executed** | No end-to-end pipeline accuracy or recall can be claimed yet |
-| Dynamic-analysis validation | **In progress** | 2/5 confirmed via genuine blind-seeded fuzzing (CVE-2026-29004, CVE-2021-42373); 3/5 in progress — see "Full pipeline status per CVE" below |
+| Dynamic-analysis validation | **In progress** | 3/5 confirmed via genuine blind-seeded fuzzing (CVE-2026-29004, CVE-2021-42373, CVE-2021-42374); 2/5 in progress — see "Full pipeline status per CVE" below |
 
 ## Tier A outcome counts
 
@@ -254,7 +254,7 @@ never reported here as a confirmation.
 | CVE-2026-29004 (heap-buffer-overflow, udhcpc6) | TP confirmed | Confirmed | **Confirmed** — blind-seeded AFL campaign, cross-checked absent on patched |
 | CVE-2017-15873 (integer-overflow, bunzip2) | TP confirmed | Retained — unresolved (needs value-range tracking across a decode loop, outside this design's scope) | Not yet confirmed — real search effort (~2hr combined), harness verified working, no crash found yet |
 | CVE-2021-42373 (NULL-deref, man) | TP confirmed | Confirmed (vulnerable); patched variant correctly suppressed as the pilot's true-negative control | **Confirmed** — blind-seeded AFL campaign, cross-checked absent on patched |
-| CVE-2021-42374 (OOB-read, unlzma) | Abstained (buffer size set in a callee outside the isolated function — a correct "can't tell," not a wrong answer) | Retained — unresolved (same value-range limitation) | Confirmed once in an early informal run (non-blind-methodology seed); the full blind-methodology campaign has not yet reproduced it — in progress |
+| CVE-2021-42374 (OOB-read, unlzma) | Abstained (buffer size set in a callee outside the isolated function — a correct "can't tell," not a wrong answer) | Retained — unresolved (same value-range limitation) | **Confirmed** — full blind-methodology campaign (82 min, 187,274 execs), same crash offset as the earlier informal find, cross-checked absent on patched |
 | CVE-2021-42386 (use-after-free, awk) | Missed entirely (function-local visibility — the free/stale-reference/reuse sequence spans multiple functions) | Never forwarded to Tier B (a true Tier A miss) | Not yet confirmed — harness verified working, several unrelated crash classes found and ruled out (cross-checked present on patched too); this is Stage 9's lowest-priority "special case" test, not its primary purpose (see `../DYNAMIC-ANALYSIS-PLAN.md` Section 2) |
 
 **Stage 9's actual load-bearing purpose, made concrete by this table**:
