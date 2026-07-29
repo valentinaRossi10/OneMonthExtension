@@ -17,13 +17,13 @@ One subdirectory per ground-truth case, each containing:
 
 ## Status
 
-| Case | Harness | Verified crash repro | Calibration run |
-|---|---|---|---|
-| CVE-2026-29004 (udhcpc6) | done | **yes — via real blind-seeded exploration** (~19 min, 7/7 crashes cross-checked as fix-specific true positives; supersedes the earlier hand-crafted-seed confirmation). See `CAMPAIGN-RESULTS.md` | yes (60s, no false positives) |
-| CVE-2017-15873 (bunzip2) | done | not yet — needs a longer/guided campaign, not a hand-craftable trigger | yes (4 min, 80.42% coverage, 0 crashes, no false positives) |
-| CVE-2021-42374 (unlzma) | done | **yes — found autonomously** by AFL++ (SEGV, wild pointer read); cross-checked absent on patched source | yes (4 min, 83.50% coverage, 1 crash) |
-| CVE-2021-42373 (man) | done | yes (hand-crafted argv, first try — NULL deref); cross-checked absent on patched source | yes (60s, 14,813 execs, 2 crashes, re-verified after linker-stub fix) |
-| CVE-2021-42386 (awk) | done | not yet — 21 crashes found in discovery campaign, all cross-checked and ruled out as unrelated to this CVE (19 stack-overflow + 1 unrelated SEGV, both also present on patched source); target UAF needs a more targeted (nested-call) seed | yes (4 min, 39,536 execs) |
+| Case                     | Harness | Verified crash repro                                                                                                                                                                                                                        | Calibration run                                                       |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| CVE-2026-29004 (udhcpc6) | done    | **yes — via real blind-seeded exploration** (~19 min, 7/7 crashes cross-checked as fix-specific true positives; supersedes the earlier hand-crafted-seed confirmation). See `CAMPAIGN-RESULTS.md`                                           | yes (60s, no false positives)                                         |
+| CVE-2017-15873 (bunzip2) | done    | not yet — needs a longer/guided campaign, not a hand-craftable trigger                                                                                                                                                                      | yes (4 min, 80.42% coverage, 0 crashes, no false positives)           |
+| CVE-2021-42374 (unlzma)  | done    | **yes — found autonomously** by AFL++ (SEGV, wild pointer read); cross-checked absent on patched source                                                                                                                                     | yes (4 min, 83.50% coverage, 1 crash)                                 |
+| CVE-2021-42373 (man)     | done    | **yes — via real blind-seeded exploration** (96s, 9,844 execs, crash found immediately; cross-checked absent on patched source; supersedes the earlier hand-crafted-argv confirmation). See `CAMPAIGN-RESULTS.md`                           | yes (60s, 14,813 execs, 2 crashes, re-verified after linker-stub fix) |
+| CVE-2021-42386 (awk)     | done    | not yet — 21 crashes found in discovery campaign, all cross-checked and ruled out as unrelated to this CVE (19 stack-overflow + 1 unrelated SEGV, both also present on patched source); target UAF needs a more targeted (nested-call) seed | yes (4 min, 39,536 execs)                                             |
 
 **Found and fixed while building the awk harness**: the shared
 `bb_show_usage()` linker stub called `abort()`, turning ordinary
@@ -45,6 +45,7 @@ it a confirmation — a crash alone is not evidence for a specific CVE
 unless it's absent once the fix is applied.
 
 **Harness design patterns that emerged, reusable across cases:**
+
 - Byte-buffer input (udhcpc6, bunzip2, unlzma): feed fuzzer bytes
   directly via stdin/`src_fd` to an already- or newly-exposed decode
   function.
@@ -62,6 +63,7 @@ unless it's absent once the fix is applied.
   excluded from every build.
 
 **Results, plainly stated:**
+
 - **3 of 5 confirmed as true positives via dynamic analysis**:
   CVE-2026-29004, CVE-2021-42374, CVE-2021-42373 — each has a crash
   that reproduces on the vulnerable source and is absent (clean
