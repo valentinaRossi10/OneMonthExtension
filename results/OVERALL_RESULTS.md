@@ -1,6 +1,6 @@
 # Overall pipeline results
 
-Last updated: 2026-07-27
+Last updated: 2026-07-29
 
 This is the human-readable progress dashboard for the experiment. The
 normative methodology remains in [`EXPERIMENT.md`](../EXPERIMENT.md), and the
@@ -21,7 +21,7 @@ they are not pooled into a synthetic five-pair matrix score.
 | Complete five-pair Tier B oracle matrix | **Not completed** | Historical pilot and versioned follow-ups cannot be pooled as one matrix |
 | Tier B redesign (`confirm-and-filter-vulnerabilities`) six-case pilot | Completed | 2/4 real vulnerabilities confirmed, 1 true negative correctly suppressed, 3 cases retained as documented capability-gap limitations |
 | Tier A → Tier B cascade | **Not executed** | No end-to-end pipeline accuracy or recall can be claimed yet |
-| Dynamic-analysis validation | **Not executed** | Outside the current static benchmark |
+| Dynamic-analysis validation | **In progress** | 2/5 confirmed via genuine blind-seeded fuzzing (CVE-2026-29004, CVE-2021-42373); 3/5 in progress — see "Full pipeline status per CVE" below |
 
 ## Tier A outcome counts
 
@@ -240,3 +240,29 @@ directories under `results/tier-b/filter-runs/` for exact per-run figures.
 - [Six-case schema-v2 run](tier-b/filter-runs/2026-07-26t071257z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v2) — CVE-2026-29004 confirmed, CVE-2021-42373 patched suppressed
 - [Six-case schema-v3 run](tier-b/filter-runs/2026-07-26t084318z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cascade-six-case-medium-schema-v3-preflight-v2) — CVE-2021-42373 vulnerable confirmed after the validator fix
 - [CVE-2021-42374 v4 contradiction-proof retry (final state)](tier-b/filter-runs/2026-07-27t031407z__gpt-5.6-sol__medium__tier-a-mixed-recovered-cve-2021-42374-contradiction-proof-v4)
+
+## Full pipeline status per CVE (all 3 stages)
+
+Kept updated as Stage 9 (dynamic analysis, `../dynamic-analysis/`)
+executes. "Dynamic analysis" status here always reflects a *confirmed*
+crash (reproduces on vulnerable, absent on patched with the identical
+input) unless explicitly marked otherwise — a raw crash count alone is
+never reported here as a confirmation.
+
+| CVE (bug class) | Tier A (function-level) | Tier B (codebase-level, six-case pilot) | Dynamic analysis |
+|---|---|---|---|
+| CVE-2026-29004 (heap-buffer-overflow, udhcpc6) | TP confirmed | Confirmed | **Confirmed** — blind-seeded AFL campaign, cross-checked absent on patched |
+| CVE-2017-15873 (integer-overflow, bunzip2) | TP confirmed | Retained — unresolved (needs value-range tracking across a decode loop, outside this design's scope) | Not yet confirmed — real search effort (~2hr combined), harness verified working, no crash found yet |
+| CVE-2021-42373 (NULL-deref, man) | TP confirmed | Confirmed (vulnerable); patched variant correctly suppressed as the pilot's true-negative control | **Confirmed** — blind-seeded AFL campaign, cross-checked absent on patched |
+| CVE-2021-42374 (OOB-read, unlzma) | Abstained (buffer size set in a callee outside the isolated function — a correct "can't tell," not a wrong answer) | Retained — unresolved (same value-range limitation) | Confirmed once in an early informal run (non-blind-methodology seed); the full blind-methodology campaign has not yet reproduced it — in progress |
+| CVE-2021-42386 (use-after-free, awk) | Missed entirely (function-local visibility — the free/stale-reference/reuse sequence spans multiple functions) | Never forwarded to Tier B (a true Tier A miss) | Not yet confirmed — harness verified working, several unrelated crash classes found and ruled out (cross-checked present on patched too); this is Stage 9's lowest-priority "special case" test, not its primary purpose (see `../DYNAMIC-ANALYSIS-PLAN.md` Section 2) |
+
+**Stage 9's actual load-bearing purpose, made concrete by this table**:
+CVE-2017-15873 and CVE-2021-42374 are the two cases Tier B explicitly
+could not resolve — resolving them is why dynamic analysis exists in
+this pipeline, not an incidental extra. CVE-2026-29004 and
+CVE-2021-42373 being independently reconfirmed by dynamic analysis is
+cross-validation of Tier B's own claims, not new information. CVE-2021-42386
+is a distinct, lower-priority question (does dynamic analysis catch
+something the static pipeline missed at every stage) that should not
+consume priority time ahead of the two Priority-1 cases above.
