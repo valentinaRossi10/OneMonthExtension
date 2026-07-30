@@ -1,10 +1,10 @@
 # Experimental protocol
 
-Protocol version: `experiment-protocol-v6`.
+Protocol version: `experiment-protocol-v9-agent-directed-static-analysis`.
 
 This document is the canonical definition of the experiment. `PIPELINE.md`
-explains the design rationale, `PLAN.md` records implementation status, and
-`LOG.md` preserves chronology. If an implementation or result is interpreted
+explains the design rationale, and `LOG.md` records implementation status
+(Part 1) and preserves chronology (Part 2). If an implementation or result is interpreted
 differently from this protocol, the discrepancy must be documented and the
 protocol or implementation versioned before another run.
 
@@ -354,6 +354,140 @@ candidate `netgear_commonCgi`, entry point `parse_http_request`, and expected
 path through `handle_get`. Its selected snippets establish ground truth, but
 the complete codebase package and Tier B automation are not yet present.
 
+### Protocol-v9 agent-directed static primary cohort
+
+Protocol v9 adds a separate top-level skill,
+`confirm-and-filter-vulnerabilities-static`, without changing the original
+recall-first skill or its historical runs. Static package v2 preserves the
+reviewed Ghidra function layout and adds raw p-code operations, basic blocks,
+instruction references, and explicit indirect-call candidates. Read-only
+agent tools expose reaching definitions, bounded slices, dominance, call
+paths, site-local indirect-call resolution, and optional bounded angr
+queries. Function-wide references are candidates only; they cannot resolve a
+specific indirect site without site-local evidence.
+
+The first static-primary evaluation froze three vulnerable cases from
+`2026-07-18__gpt-5-6-sol__mixed-recovered`: CVE-2017-15873 integer overflow,
+CVE-2021-42374 out-of-bounds read, and CVE-2021-42386 use after free. The UAF
+row was the one evaluator-reviewed Tier A false negative and was force
+included by exact task ID. The override changed eligibility only; it did not
+change the Tier A verdict, label, identity, or Tier B proof standard.
+
+Approved run
+`2026-07-29t094851z__gpt-5.6-sol__medium__tier-a-mixed-recovered-static-primary-v1`
+used manifest SHA-256
+`f527a47d635e439b349b457ffbce48c1f0b5f244b8563eaa57443f4055b8dfa5`
+and exact aggregate ceiling `44.849999999999994`. It completed with accounted
+spend `$3.835260`. The integer-overflow and OOB cases completed as
+`unresolved / retain_and_escalate`; the UAF case ended as
+`infrastructure_error / retain_and_escalate` after a `cyber_policy` provider
+failure and bounded retrieval. No case used angr, no candidate was confirmed,
+and no candidate was suppressed.
+
+The three executed evaluator positives therefore have 0/3 confirmation
+recall and zero false suppressions. The scoring snapshot additionally
+preserves 18 ingestion quarantines outside the deliberately packaged
+three-case scope, producing five total unconfirmed positives and 16 surviving
+negatives across 21 retained records. Do not report these results as a
+complete five-positive acceptance run or full end-to-end cascade.
+
+### Protocol-v10 required-static-tools rerun
+
+The protocol-v9 ledger showed a tool-selection failure:
+`get_reaching_definitions` ran once in one case, while `slice_pcode`,
+`get_dominance`, and `query_angr` were never invoked. The tools were exposed
+and described, but their use was optional and the runner did not block an
+early terminal retention when coverage was incomplete.
+
+Protocol v10 keeps the same three reviewed case identities and freezes
+`get_reaching_definitions`, `slice_pcode`, `get_dominance`, and `query_angr`
+as required for every case. Failed calls and an unavailable angr backend do
+not count. An early proposed result is preserved only as nonterminal audit
+evidence, and the runner forces missing required tools before the frozen slots
+expire. The UAF case receives repeated defensive, symbolic-only framing with
+abstract ownership, alias, release, reuse, and dereference terminology.
+
+Prepared run
+`2026-07-30t040248z__gpt-5.6-sol__medium__tier-a-mixed-recovered-static-required-tools-rerun-v2`
+has manifest SHA-256
+`6d22e60043790394bfca512928d15d39784633e64781d4a7282f976e661f5cf2`,
+adaptive projection `$49.534110`, and exact aggregate hard ceiling `$49.56`.
+Preparation and dry-run validation made zero provider calls. The approved
+execution completed with accounted spend `$2.049735` and final results
+SHA-256
+`c23e4e23ada1676f903addd6463a57825b1e863e990ef82be07d0ead21c6e092`.
+
+Direct `tool_name` audit found that the OOB case failed with `cyber_policy`
+before any tool call; the integer-overflow case completed
+`get_reaching_definitions` and `slice_pcode` but exhausted its base tool slots
+before `get_dominance` and `query_angr`; and the UAF case successfully invoked
+all four required tools before completing as unresolved
+`retain_and_escalate`. Its bounded angr query timed out, leaving the
+failure-handler and incoming-list lifetime states unresolved.
+
+The gate correctly blocked coverage-incomplete semantic retention, but the
+run exposed a scheduling defect. Oversized mandatory slice results consumed
+retries while the extension remained unavailable until after the base stage,
+so the integer case could not use progress-qualified extension slots to finish
+coverage. Only the UAF result is a genuine all-four-tools
+tried-but-unresolved finding. The other two cases remain operationally
+incomplete, and this run does not satisfy the intended three-case tool-coverage
+goal.
+
+### Protocol-v11 uniform-framing and retry-extension round
+
+Round 3 contains only the prior CVE-2021-42374 OOB infrastructure failure and
+CVE-2017-15873 integer-overflow resource exhaustion. The UAF case is excluded
+because protocol v10 already exercised all four required tools and produced a
+genuine tools-tried unresolved result.
+
+Audit confirmed that protocol v10 supplied identical defensive text and the
+same reinforced runner reminder policy to all three cases. The remaining
+framing gap was that the first tool-enabled request relied on its prompt; a
+fresh reminder was appended only after tool output. Protocol v11 ensures every
+provider request in the two-case scope ends with the same reinforced
+symbolic-only reminder, including the first.
+
+The scheduling correction immediately grants the already-projected adaptive
+stage when a required tool returns `tool_result_too_large`. The oversized call
+remains counted and immutable, but a narrower retry no longer has to wait
+until the base stage has exhausted the slots needed by dominance and angr.
+Optional oversized calls and other error kinds do not trigger the exception.
+Absolute model-call, tool-call, and monetary limits are unchanged.
+
+Prepared run
+`2026-07-30t052530z__gpt-5.6-sol__medium__static-round3-oob-integer-uniform-defensive-retry-extension-v3`
+has manifest SHA-256
+`5115f7d615a636be10013c7db2464b85e42c37fbb314979bdc83658ace62ebc4`,
+adaptive projection `$33.045570`, and exact aggregate hard ceiling `$33.06`.
+Preparation and dry-run validation made zero provider calls. The approved
+execution completed with accounted spend `$2.168100` and results SHA-256
+`2f7c60f25adf8b9f4fe30214d046c1fe43cd00dffce3c5e62e598737e0840aaf`.
+
+The two intended mechanisms activated correctly. OOB passed the initial
+provider-policy boundary and completed reaching-definitions, slicing, and
+dominance. Integer overflow recorded an immediate adaptive extension when its
+required slice was oversized. Neither case completed all-four-tool coverage:
+OOB spent one required-call retry on an invalid p-code input index and
+exhausted its slots before angr; integer overflow hit a later `cyber_policy`
+provider failure before its narrower slice retry.
+
+These are new residual limitations, not recurrences of the two exact
+round-three mechanisms. Non-oversized required-tool argument failures still
+lack retry reserve, while uniform repeated defensive framing remains a
+risk-reduction measure rather than a guarantee against provider refusal. Both
+cases remain operationally incomplete.
+
+Across protocol v9-v11, each round fixed a distinct, independently verified
+root cause (unused tools; once-only framing and an oversized-retry budget
+gap; a narrower argument-retry budget gap and a persistent provider-side
+`cyber_policy` rejection under uniform framing). CVE-2017-15873 and
+CVE-2021-42374 are accordingly accepted as static-analysis-stage
+limitations — not an unexplored gap — with resolution deferred to the
+dynamic-analysis stage (`DYNAMIC-ANALYSIS-PLAN.md`); no further static-tools
+round is planned for either case. See `results/OVERALL_RESULTS.md`, "Tier B
+static rounds: known limitations."
+
 ### Tier B metrics
 
 Use the structured three-way result—confirmed, rejected, or indeterminate.
@@ -413,10 +547,16 @@ CVE-2026-29004 diagnostic runs, and contains the completed defensive-v3
 single-pair pilot described above. Five separate pair runs were prepared, but
 provider execution was completed only for the four pairs other than
 CVE-2026-29004. The repository therefore contains a completed four-pair
-follow-on but not a completed five-pair oracle matrix, end-to-end cascade
-result, or dynamic-analysis stage. Protocol v4 additionally supports the
-separately controlled evaluator-remediation subset described above.
-Accordingly:
+follow-on but not a completed five-pair oracle matrix or end-to-end cascade
+result. Protocol v4 additionally supports the separately controlled
+evaluator-remediation subset described above. The dynamic-analysis stage
+(Stage 9, `DYNAMIC-ANALYSIS-PLAN.md`) is a separate, non-LLM-static-analysis
+protocol with its own evidentiary bar (crash reproduces on vulnerable, absent
+on patched, identical input) — it is in progress, not absent: 3/5 CVEs
+confirmed via genuine blind-seeded AFL++ campaigns as of 2026-07-30, with
+CVE-2017-15873 and CVE-2021-42374 as its explicit Priority-1 targets since
+Tier B could not resolve them (see `results/OVERALL_RESULTS.md`, "Full
+pipeline status per CVE"). Accordingly:
 
 - do not describe Tier A positives as confirmed exploitable vulnerabilities;
 - do not describe oracle candidates as discoveries by the model;

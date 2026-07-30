@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recall-first Tier B filter result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_class",
+    "semantic_status",
+    "pipeline_disposition",
+    "execution_status",
+    "candidate_identity",
+    "hypotheses",
+    "proof_obligations",
+    "reachability",
+    "evidence",
+    "blocking_controls",
+    "unresolved_facts",
+    "progress_events",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": {"type": "string", "const": "tier-b-filter-result-v2"},
+    "target_class": {
+      "type": "string",
+      "enum": [
+        "command-injection",
+        "heap-buffer-overflow",
+        "integer-overflow",
+        "null-pointer-dereference",
+        "out-of-bounds-read",
+        "use-after-free"
+      ]
+    },
+    "semantic_status": {
+      "type": "string",
+      "enum": ["confirmed", "safety_proven", "unresolved"]
+    },
+    "pipeline_disposition": {
+      "type": "string",
+      "enum": [
+        "retain_confirmed",
+        "suppress_proven_false_positive",
+        "retain_and_escalate"
+      ]
+    },
+    "execution_status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "provider_refusal",
+        "infrastructure_error",
+        "resource_exhausted",
+        "invalid_output"
+      ]
+    },
+    "candidate_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "function_uid", "artifact_sha256", "evidence"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["present", "absent", "ambiguous"]
+        },
+        "function_uid": {"type": "string"},
+        "artifact_sha256": {"type": "string"},
+        "evidence": {"type": "string", "minLength": 1, "maxLength": 2000}
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["hypothesis", "status", "evidence"],
+        "properties": {
+          "hypothesis": {"type": "string", "minLength": 1, "maxLength": 1000},
+          "status": {
+            "type": "string",
+            "enum": ["satisfied", "contradicted", "unresolved"]
+          },
+          "evidence": {"type": "array", "items": {"type": "string", "maxLength": 1000}}
+        }
+      }
+    },
+    "proof_obligations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["obligation", "status", "evidence"],
+        "properties": {
+          "obligation": {"type": "string", "minLength": 1, "maxLength": 1000},
+          "status": {
+            "type": "string",
+            "enum": ["satisfied", "contradicted", "unresolved"]
+          },
+          "evidence": {"type": "array", "items": {"type": "string", "maxLength": 1000}}
+        }
+      }
+    },
+    "reachability": {
+      "type": "string",
+      "enum": ["reachable", "unreachable", "unresolved"]
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["function_uid", "line", "claim"],
+        "properties": {
+          "function_uid": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "claim": {"type": "string", "minLength": 1, "maxLength": 1000}
+        }
+      }
+    },
+    "blocking_controls": {"type": "array", "items": {"type": "string", "maxLength": 1000}},
+    "unresolved_facts": {"type": "array", "items": {"type": "string", "maxLength": 1000}},
+    "progress_events": {"type": "array", "items": {"type": "string", "maxLength": 1000}},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 4000}
+  }
+}

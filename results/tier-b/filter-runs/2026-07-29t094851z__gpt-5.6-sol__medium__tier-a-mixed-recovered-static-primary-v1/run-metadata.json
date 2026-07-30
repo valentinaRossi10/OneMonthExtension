@@ -1,0 +1,49 @@
+{
+  "accounted_spend_usd": 3.8352599999999994,
+  "approved_budget_usd": 44.849999999999994,
+  "approved_manifest_sha256": "f527a47d635e439b349b457ffbce48c1f0b5f244b8563eaa57443f4055b8dfa5",
+  "comparison_source_manifest_sha256": "54831543f21570ff7ecde6efc6a06f59580ff2dd159fc4e286baec480bcd928f",
+  "comparison_source_run_id": "2026-07-18__gpt-5-6-sol__mixed-recovered",
+  "created_at_utc": "2026-07-29T09:49:40.145002+00:00",
+  "decision_priority": {
+    "confirmation_has_full_adaptive_allowance_after_progress": true,
+    "confirmation_has_full_base_allowance": true,
+    "incomplete_suppression_disposition": "retain_and_escalate",
+    "primary_objective": "retain_confirmed",
+    "secondary_objective": "suppress_proven_false_positive",
+    "suppression_must_not_override_completed_confirmation": true
+  },
+  "experiment_notes": [
+    "Prepared only; zero provider calls. Explicit approval required before execution."
+  ],
+  "experiment_version": "experiment-protocol-v9-agent-directed-static-analysis",
+  "input_price_per_million": 5.0,
+  "last_executed_at_utc": "2026-07-30T03:04:42.913223+00:00",
+  "manifest_sha256": "f527a47d635e439b349b457ffbce48c1f0b5f244b8563eaa57443f4055b8dfa5",
+  "metadata_version": "tier-b-filter-run-v1",
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "package_version": "tier-b-filter-static-package-v2",
+  "policy_version": "tier-b-filter-policy-v4-static-primary-v1",
+  "prompt_version": "tier-b-filter-prompt-v4",
+  "protocol_version": "v4",
+  "provider_api_calls_made": 44,
+  "provider_generation_calls_made": 43,
+  "provider_retrieval_calls_made": 1,
+  "queue_dir": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-b/static-preparation/2026-07-29__three-primary/queue",
+  "queue_version": "tier-b-filter-queue-v1",
+  "reasoning_effort": "medium",
+  "result_schema_sha256": "aa577a1942867a0c1538bc27864abf1cee64052208e531f403d769efe123047f",
+  "reviewed_scope_kind": "static_primary",
+  "reviewed_scope_sha256": "c1e17c53ba64091b804469e2a6c76830d7b54de252e37b9d5d171b85a0f53412",
+  "reviewed_scope_version": "tier-b-filter-v4-static-primary-three-case-scope-v1",
+  "run_id": "2026-07-29t094851z__gpt-5.6-sol__medium__tier-a-mixed-recovered-static-primary-v1",
+  "schema_version": "tier-b-filter-result-v4",
+  "selected_case_ids": [
+    "tier-b-case-b111eb91e1a79ebe60c176fc",
+    "tier-b-case-b458bbf5b4ee3b7538c0ab0e",
+    "tier-b-case-e110a030eba0d95e170ac7de"
+  ],
+  "source_queue_case_count": 7,
+  "status": "completed"
+}

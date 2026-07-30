@@ -1,0 +1,4 @@
+interface:
+  display_name: "Confirm and Filter Vulnerabilities — Static"
+  short_description: "Agent-directed Ghidra and angr Tier B analysis"
+  default_prompt: "Use $confirm-and-filter-vulnerabilities-static to investigate a frozen Tier A queue with agent-directed Ghidra and angr analyses."

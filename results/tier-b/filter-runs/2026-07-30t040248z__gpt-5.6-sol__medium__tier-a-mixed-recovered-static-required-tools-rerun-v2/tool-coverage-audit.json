@@ -1,0 +1,67 @@
+{
+  "audit_version": "tier-b-required-tool-coverage-audit-v1",
+  "run_id": "2026-07-30t040248z__gpt-5.6-sol__medium__tier-a-mixed-recovered-static-required-tools-rerun-v2",
+  "manifest_sha256": "6d22e60043790394bfca512928d15d39784633e64781d4a7282f976e661f5cf2",
+  "results_sha256": "c23e4e23ada1676f903addd6463a57825b1e863e990ef82be07d0ead21c6e092",
+  "accounted_spend_usd": 2.0497349999999996,
+  "approved_budget_usd": 49.56,
+  "required_tool_names": [
+    "get_reaching_definitions",
+    "slice_pcode",
+    "get_dominance",
+    "query_angr"
+  ],
+  "all_cases_completed_required_tool_coverage": false,
+  "cases": [
+    {
+      "case_id": "tier-b-case-b111eb91e1a79ebe60c176fc",
+      "target_class": "out-of-bounds-read",
+      "terminal_status": "infrastructure_error",
+      "execution_status": "infrastructure_error",
+      "pipeline_disposition": "retain_and_escalate",
+      "successful_required_tool_names": [],
+      "missing_required_tool_names": [
+        "get_reaching_definitions",
+        "slice_pcode",
+        "get_dominance",
+        "query_angr"
+      ],
+      "required_tool_coverage_complete": false,
+      "limitation": "The first provider generation failed with cyber_policy before any tool call; bounded retrieval failed and the refusal was not retried."
+    },
+    {
+      "case_id": "tier-b-case-b458bbf5b4ee3b7538c0ab0e",
+      "target_class": "integer-overflow",
+      "terminal_status": "resource_exhausted",
+      "execution_status": "resource_exhausted",
+      "pipeline_disposition": "retain_and_escalate",
+      "successful_required_tool_names": [
+        "get_reaching_definitions",
+        "slice_pcode"
+      ],
+      "missing_required_tool_names": [
+        "get_dominance",
+        "query_angr"
+      ],
+      "required_tool_coverage_complete": false,
+      "limitation": "Two forced slice_pcode calls returned tool_result_too_large before a third bounded slice succeeded. The base tool slots were then exhausted before dominance or angr, and the adaptive extension was not yet eligible."
+    },
+    {
+      "case_id": "tier-b-case-e110a030eba0d95e170ac7de",
+      "target_class": "use-after-free",
+      "terminal_status": "ok",
+      "execution_status": "completed",
+      "pipeline_disposition": "retain_and_escalate",
+      "successful_required_tool_names": [
+        "get_reaching_definitions",
+        "slice_pcode",
+        "get_dominance",
+        "query_angr"
+      ],
+      "missing_required_tool_names": [],
+      "required_tool_coverage_complete": true,
+      "angr_backend_status": "timeout",
+      "limitation": "The bounded candidate-to-use query reached its wall-clock timeout. Failure-handler lifetime effects and the incoming global-list lifetime invariant remained unresolved."
+    }
+  ]
+}

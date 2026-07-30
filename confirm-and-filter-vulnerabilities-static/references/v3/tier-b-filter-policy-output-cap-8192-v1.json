@@ -1,0 +1,52 @@
+{
+  "experiment_version": "experiment-protocol-v7-asymmetric-gate",
+  "policy_version": "tier-b-filter-policy-v3-output-cap-8192-v1",
+  "prompt_version": "tier-b-filter-prompt-v3",
+  "schema_version": "tier-b-filter-result-v3",
+  "reviewed_scope": "tier-b-filter-v3-output-cap-retry-scope-v1",
+  "package_version": "tier-b-filter-package-v1",
+  "queue_version": "tier-b-filter-queue-v1",
+  "transport": {
+    "mode": "synchronous_streaming",
+    "sdk_max_retries": 0,
+    "parallel_tool_calls": false
+  },
+  "decision_priority": {
+    "primary_objective": "retain_confirmed",
+    "secondary_objective": "suppress_proven_false_positive",
+    "confirmation_has_full_base_allowance": true,
+    "confirmation_has_full_adaptive_allowance_after_progress": true,
+    "suppression_must_not_override_completed_confirmation": true,
+    "incomplete_suppression_disposition": "retain_and_escalate"
+  },
+  "model_settings": {
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "medium"
+  },
+  "limits": {
+    "max_budget_usd_per_case": 14.46,
+    "base_model_calls": 13,
+    "base_tool_calls": 12,
+    "extension_model_calls": 4,
+    "extension_tool_calls": 4,
+    "max_output_tokens_per_call": 8192,
+    "max_tool_result_chars": 12000,
+    "max_function_chars": 50000,
+    "max_search_hits": 20,
+    "max_static_slice_nodes": 200,
+    "max_call_graph_depth": 8,
+    "max_angr_active_states": 64,
+    "max_angr_queries_per_case": 3,
+    "max_package_functions": 5000,
+    "max_package_total_chars": 50000000,
+    "chars_per_estimated_token": 2
+  },
+  "supported_classes": [
+    "command-injection",
+    "heap-buffer-overflow",
+    "integer-overflow",
+    "null-pointer-dereference",
+    "out-of-bounds-read",
+    "use-after-free"
+  ]
+}

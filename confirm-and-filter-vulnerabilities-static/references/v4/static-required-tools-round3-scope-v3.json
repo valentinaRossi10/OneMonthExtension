@@ -1,0 +1,45 @@
+{
+  "scope_version": "tier-b-filter-v4-static-required-tools-two-case-round3-scope-v3",
+  "scope_kind": "static_required_tools_round3",
+  "parent_scope_version": "tier-b-filter-v4-static-primary-required-tools-three-case-scope-v2",
+  "parent_scope_sha256": "765973344036deaa36658a6bae2dbc34c0bb2af932ff1af81979272c3bbd0754",
+  "source_run_id": "2026-07-30t040248z__gpt-5.6-sol__medium__tier-a-mixed-recovered-static-required-tools-rerun-v2",
+  "source_manifest_sha256": "6d22e60043790394bfca512928d15d39784633e64781d4a7282f976e661f5cf2",
+  "source_results_sha256": "c23e4e23ada1676f903addd6463a57825b1e863e990ef82be07d0ead21c6e092",
+  "required_tool_names": [
+    "get_reaching_definitions",
+    "slice_pcode",
+    "get_dominance",
+    "query_angr"
+  ],
+  "required_prior_terminal_status_by_case": {
+    "tier-b-case-b111eb91e1a79ebe60c176fc": "infrastructure_error",
+    "tier-b-case-b458bbf5b4ee3b7538c0ab0e": "resource_exhausted"
+  },
+  "required_prior_missing_tool_names_by_case": {
+    "tier-b-case-b111eb91e1a79ebe60c176fc": [
+      "get_reaching_definitions",
+      "slice_pcode",
+      "get_dominance",
+      "query_angr"
+    ],
+    "tier-b-case-b458bbf5b4ee3b7538c0ab0e": [
+      "get_dominance",
+      "query_angr"
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "tier-b-case-b111eb91e1a79ebe60c176fc",
+      "artifact_sha256": "e172b377acbad6bcb8f8a557ebb36437829bab6129c7ae657157c6030334d1ef",
+      "function_uid": "fn-f85c4f6016bffef52d674a93638771cd",
+      "target_class": "out-of-bounds-read"
+    },
+    {
+      "case_id": "tier-b-case-b458bbf5b4ee3b7538c0ab0e",
+      "artifact_sha256": "881febe14700f18c03321f23fab65ebb6ad7614e1467c98049cf6db4308ebaae",
+      "function_uid": "fn-0bd2eff750a9a12b67b17f5aed74336e",
+      "target_class": "integer-overflow"
+    }
+  ]
+}

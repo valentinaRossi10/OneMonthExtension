@@ -1,0 +1,59 @@
+{
+  "accounted_spend_usd": 2.1681,
+  "approved_budget_usd": 33.06,
+  "approved_manifest_sha256": "5115f7d615a636be10013c7db2464b85e42c37fbb314979bdc83658ace62ebc4",
+  "comparison_source_manifest_sha256": "6d22e60043790394bfca512928d15d39784633e64781d4a7282f976e661f5cf2",
+  "comparison_source_run_id": "2026-07-30t040248z__gpt-5.6-sol__medium__tier-a-mixed-recovered-static-required-tools-rerun-v2",
+  "created_at_utc": "2026-07-30T05:26:04.276080+00:00",
+  "decision_priority": {
+    "confirmation_has_full_adaptive_allowance_after_progress": true,
+    "confirmation_has_full_base_allowance": true,
+    "incomplete_suppression_disposition": "retain_and_escalate",
+    "primary_objective": "retain_confirmed",
+    "secondary_objective": "suppress_proven_false_positive",
+    "suppression_must_not_override_completed_confirmation": true
+  },
+  "experiment_notes": [
+    "Round 3 reruns only the prior OOB cyber_policy infrastructure failure and integer required-tool scheduling exhaustion.",
+    "Every provider request receives the same defensive symbolic-only reminder, including the first tool-enabled request.",
+    "A required tool_result_too_large immediately unlocks the frozen adaptive stage for narrower retry without increasing absolute limits."
+  ],
+  "experiment_version": "experiment-protocol-v11-uniform-defensive-retry-extension",
+  "input_price_per_million": 5.0,
+  "last_executed_at_utc": "2026-07-30T07:28:15.778652+00:00",
+  "manifest_sha256": "5115f7d615a636be10013c7db2464b85e42c37fbb314979bdc83658ace62ebc4",
+  "metadata_version": "tier-b-filter-run-v1",
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "package_version": "tier-b-filter-static-package-v2",
+  "policy_version": "tier-b-filter-policy-v4-static-round3-v3",
+  "prompt_version": "tier-b-filter-prompt-v6-uniform-defensive-retry-extension",
+  "protocol_version": "v4",
+  "provider_api_calls_made": 24,
+  "provider_generation_calls_made": 23,
+  "provider_retrieval_calls_made": 1,
+  "queue_dir": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-b/static-preparation/2026-07-29__three-primary/queue",
+  "queue_version": "tier-b-filter-queue-v1",
+  "reasoning_effort": "medium",
+  "request_defensive_reminder": "every-provider-request-v1",
+  "required_tool_names": [
+    "get_reaching_definitions",
+    "slice_pcode",
+    "get_dominance",
+    "query_angr"
+  ],
+  "required_tool_retry_extension": "tool-result-too-large-v1",
+  "result_schema_sha256": "aa577a1942867a0c1538bc27864abf1cee64052208e531f403d769efe123047f",
+  "reviewed_scope_kind": "static_required_tools_round3",
+  "reviewed_scope_sha256": "b24737436a5ddb4dfead29d88d2aeb833d4a08d110b57d9689fbda8fd536b9e6",
+  "reviewed_scope_version": "tier-b-filter-v4-static-required-tools-two-case-round3-scope-v3",
+  "run_id": "2026-07-30t052530z__gpt-5.6-sol__medium__static-round3-oob-integer-uniform-defensive-retry-extension-v3",
+  "schema_version": "tier-b-filter-result-v4",
+  "selected_case_ids": [
+    "tier-b-case-b111eb91e1a79ebe60c176fc",
+    "tier-b-case-b458bbf5b4ee3b7538c0ab0e"
+  ],
+  "source_queue_case_count": 7,
+  "status": "completed",
+  "tool_coverage_enforcement": "required-before-completed-retention-v2"
+}

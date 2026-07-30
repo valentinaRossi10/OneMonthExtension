@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "provider-call-ledger-schema-v3.json",
+  "title": "Tier B provider-call append-only ledger v3",
+  "description": "Local runner ledger schema with partial-output preservation. This is not a model-visible Structured Outputs schema.",
+  "type": "object",
+  "required": [
+    "ledger_schema_version",
+    "record_kind",
+    "recorded_at_utc",
+    "run_id",
+    "case_id",
+    "cache_key",
+    "case_attempt_index",
+    "model_call_index",
+    "call_attempt_id",
+    "request_sha256",
+    "provider_call_made"
+  ],
+  "properties": {
+    "ledger_schema_version": {
+      "type": "string",
+      "const": "tier-b-provider-call-ledger-v3"
+    },
+    "record_kind": {
+      "type": "string",
+      "enum": [
+        "provider_response_created",
+        "provider_retrieval_attempt",
+        "model_call_outcome"
+      ]
+    },
+    "recorded_at_utc": {"type": "string"},
+    "run_id": {"type": "string"},
+    "case_id": {"type": "string"},
+    "cache_key": {"type": "string"},
+    "case_attempt_index": {"type": "integer", "minimum": 1},
+    "model_call_index": {"type": "integer", "minimum": 1},
+    "call_attempt_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "request_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "provider_call_made": {"type": "boolean"},
+    "provider_response_id": {"type": ["string", "null"]},
+    "provider_event_type": {
+      "type": ["string", "null"],
+      "enum": ["response.created", null]
+    },
+    "provider_terminal_event_type": {
+      "type": ["string", "null"],
+      "enum": [
+        "response.completed",
+        "response.incomplete",
+        "response.failed",
+        "error",
+        null
+      ]
+    },
+    "provider_response_status": {
+      "type": ["string", "null"],
+      "enum": [
+        "completed",
+        "failed",
+        "in_progress",
+        "cancelled",
+        "queued",
+        "incomplete",
+        null
+      ]
+    },
+    "provider_incomplete_reason": {
+      "type": ["string", "null"]
+    },
+    "stream_outcome": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "completed_recovered",
+        "incomplete_max_output_tokens",
+        "incomplete_content_filter",
+        "incomplete_other",
+        "provider_failed",
+        "provider_error_event",
+        "stream_interrupted_after_created",
+        "stream_ended_without_terminal",
+        "stream_failed_before_created",
+        "recovery_unresolved"
+      ]
+    },
+    "stream_exception": {
+      "type": ["object", "null"],
+      "properties": {
+        "type": {"type": "string"},
+        "message": {"type": "string"}
+      },
+      "required": ["type", "message"],
+      "additionalProperties": false
+    },
+    "provider_error": {
+      "type": ["object", "null"],
+      "properties": {
+        "type": {"type": ["string", "null"]},
+        "code": {"type": ["string", "null"]},
+        "message": {"type": ["string", "null"]},
+        "param": {"type": ["string", "null"]}
+      },
+      "required": ["type", "code", "message", "param"],
+      "additionalProperties": false
+    },
+    "event_type_counts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "last_sequence_number": {"type": ["integer", "null"]},
+    "partial_output_text": {"type": "string"},
+    "partial_output_item_types": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "retrieval_attempt_index": {"type": "integer", "minimum": 1},
+    "retrieval_delay_seconds": {"type": "integer", "minimum": 0},
+    "retrieval_outcome": {"type": "string"},
+    "retrieval_error": {
+      "type": ["object", "null"],
+      "properties": {
+        "type": {"type": "string"},
+        "message": {"type": "string"}
+      },
+      "required": ["type", "message"],
+      "additionalProperties": false
+    },
+    "usage": {"type": "object"},
+    "actual_cost_usd": {"type": ["number", "null"], "minimum": 0},
+    "reserved_cost_usd": {"type": ["number", "null"], "minimum": 0}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "record_kind": {"const": "provider_response_created"}
+        }
+      },
+      "then": {
+        "required": [
+          "provider_response_id",
+          "provider_event_type",
+          "provider_response_status",
+          "last_sequence_number",
+          "reserved_cost_usd"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {"const": "provider_retrieval_attempt"}
+        }
+      },
+      "then": {
+        "required": [
+          "provider_response_id",
+          "retrieval_attempt_index",
+          "retrieval_delay_seconds",
+          "retrieval_outcome",
+          "retrieval_error"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_kind": {"const": "model_call_outcome"}
+        }
+      },
+      "then": {
+        "required": [
+          "provider_response_id",
+          "provider_terminal_event_type",
+          "provider_response_status",
+          "provider_incomplete_reason",
+          "stream_outcome",
+          "stream_exception",
+          "provider_error",
+          "event_type_counts",
+          "last_sequence_number",
+          "partial_output_text",
+          "partial_output_item_types"
+        ]
+      }
+    }
+  ],
+  "additionalProperties": true
+}

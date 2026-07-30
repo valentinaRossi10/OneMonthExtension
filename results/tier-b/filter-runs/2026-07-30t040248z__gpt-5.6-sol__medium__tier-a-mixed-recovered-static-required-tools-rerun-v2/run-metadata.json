@@ -1,0 +1,57 @@
+{
+  "accounted_spend_usd": 2.0497349999999996,
+  "approved_budget_usd": 49.56,
+  "approved_manifest_sha256": "6d22e60043790394bfca512928d15d39784633e64781d4a7282f976e661f5cf2",
+  "comparison_source_manifest_sha256": "54831543f21570ff7ecde6efc6a06f59580ff2dd159fc4e286baec480bcd928f",
+  "comparison_source_run_id": "2026-07-18__gpt-5-6-sol__mixed-recovered",
+  "created_at_utc": "2026-07-30T04:03:24.258940+00:00",
+  "decision_priority": {
+    "confirmation_has_full_adaptive_allowance_after_progress": true,
+    "confirmation_has_full_base_allowance": true,
+    "incomplete_suppression_disposition": "retain_and_escalate",
+    "primary_objective": "retain_confirmed",
+    "secondary_objective": "suppress_proven_false_positive",
+    "suppression_must_not_override_completed_confirmation": true
+  },
+  "experiment_notes": [
+    "Fresh three-case rerun requiring successful reaching-definitions, p-code slicing, dominance, and bounded angr analysis before a semantic terminal can complete.",
+    "CVE-2021-42386 uses repeated defensive symbolic-only lifetime framing at every investigation step."
+  ],
+  "experiment_version": "experiment-protocol-v10-required-static-tool-coverage",
+  "input_price_per_million": 5.0,
+  "last_executed_at_utc": "2026-07-30T04:50:20.189068+00:00",
+  "manifest_sha256": "6d22e60043790394bfca512928d15d39784633e64781d4a7282f976e661f5cf2",
+  "metadata_version": "tier-b-filter-run-v1",
+  "model": "gpt-5.6-sol",
+  "output_price_per_million": 30.0,
+  "package_version": "tier-b-filter-static-package-v2",
+  "policy_version": "tier-b-filter-policy-v4-static-required-tools-v2",
+  "prompt_version": "tier-b-filter-prompt-v5-required-static-tools",
+  "protocol_version": "v4",
+  "provider_api_calls_made": 32,
+  "provider_generation_calls_made": 31,
+  "provider_retrieval_calls_made": 1,
+  "queue_dir": "/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/results/tier-b/static-preparation/2026-07-29__three-primary/queue",
+  "queue_version": "tier-b-filter-queue-v1",
+  "reasoning_effort": "medium",
+  "required_tool_names": [
+    "get_reaching_definitions",
+    "slice_pcode",
+    "get_dominance",
+    "query_angr"
+  ],
+  "result_schema_sha256": "aa577a1942867a0c1538bc27864abf1cee64052208e531f403d769efe123047f",
+  "reviewed_scope_kind": "static_primary_required_tools",
+  "reviewed_scope_sha256": "765973344036deaa36658a6bae2dbc34c0bb2af932ff1af81979272c3bbd0754",
+  "reviewed_scope_version": "tier-b-filter-v4-static-primary-required-tools-three-case-scope-v2",
+  "run_id": "2026-07-30t040248z__gpt-5.6-sol__medium__tier-a-mixed-recovered-static-required-tools-rerun-v2",
+  "schema_version": "tier-b-filter-result-v4",
+  "selected_case_ids": [
+    "tier-b-case-b111eb91e1a79ebe60c176fc",
+    "tier-b-case-b458bbf5b4ee3b7538c0ab0e",
+    "tier-b-case-e110a030eba0d95e170ac7de"
+  ],
+  "source_queue_case_count": 7,
+  "status": "completed",
+  "tool_coverage_enforcement": "required-before-completed-retention-v1"
+}

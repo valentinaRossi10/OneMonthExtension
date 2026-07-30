@@ -1,0 +1,29 @@
+{
+  "adaptive_projected_max_cost_usd": 44.81693,
+  "aggregate_hard_ceiling_usd": 44.849999999999994,
+  "base_projected_max_cost_usd": 28.61287,
+  "case_count": 3,
+  "comparison_source_manifest_sha256": "54831543f21570ff7ecde6efc6a06f59580ff2dd159fc4e286baec480bcd928f",
+  "comparison_source_run_id": "2026-07-18__gpt-5-6-sol__mixed-recovered",
+  "ingestion_summary_sha256": "2500eabaeacf7cf7b89a87cd093e18a42a92f72dc2d8c0224b6b9471eacbef99",
+  "local_static_analysis_cost_usd": 0.0,
+  "local_static_analysis_note": "Ghidra facts are precomputed; bounded angr queries run locally and consume tool-call/time limits but no provider USD.",
+  "manifest_sha256": "f527a47d635e439b349b457ffbce48c1f0b5f244b8563eaa57443f4055b8dfa5",
+  "package_count": 3,
+  "provider_api_calls_made_during_preparation": 0,
+  "quarantine_count": 18,
+  "queue_sha256": "a6ec69d58184b426db6ca52ad41e9c2d153ebb6c1743388dce293fc938d9fae9",
+  "result_schema_sha256": "aa577a1942867a0c1538bc27864abf1cee64052208e531f403d769efe123047f",
+  "reviewed_scope_kind": "static_primary",
+  "reviewed_scope_sha256": "c1e17c53ba64091b804469e2a6c76830d7b54de252e37b9d5d171b85a0f53412",
+  "reviewed_scope_version": "tier-b-filter-v4-static-primary-three-case-scope-v1",
+  "run_id": "2026-07-29t094851z__gpt-5.6-sol__medium__tier-a-mixed-recovered-static-primary-v1",
+  "selected_case_ids": [
+    "tier-b-case-b111eb91e1a79ebe60c176fc",
+    "tier-b-case-b458bbf5b4ee3b7538c0ab0e",
+    "tier-b-case-e110a030eba0d95e170ac7de"
+  ],
+  "source_queue_case_count": 7,
+  "summary_version": "tier-b-filter-manifest-summary-v1",
+  "within_aggregate_ceiling": true
+}
