@@ -13,7 +13,7 @@ Use Ghidra pseudo-C first. When it is missing, extract only the indexed function
 
 ## Workflow
 
-1. Read the repository's `EXPERIMENT.md`, `PIPELINE.md`, `PLAN.md`, `LOG.md`, and `samples/index.csv` before changing the benchmark.
+1. Read the repository's `EXPERIMENT.md`, `PIPELINE.md`, `LOG.md`, and `samples/index.csv` before changing the benchmark.
 2. Read [classification-rubrics.json](references/classification-rubrics.json), [benchmark-policy.json](references/benchmark-policy.json), and [evaluation.md](references/evaluation.md).
 3. Prepare the complete six-class manifest without making API calls:
 

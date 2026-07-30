@@ -1,10 +1,320 @@
-# Action Log
+# Log & Plan
 
-Chronological record of work done, for session-to-session continuity.
-For *why* decisions were made, see `PIPELINE.md`. For current
-stage/status, see `PLAN.md`. Does not reference git commit hashes.
+Combined stage checklist/how-to reference and chronological action log
+(merged 2026-07-30 — previously separate `PLAN.md` and `LOG.md`, kept
+apart originally but grown redundant to cross-reference). For *why*
+each decision was made, see `PIPELINE.md`. For normative labels,
+information boundaries, handoff rules, evaluation matrices, and
+metrics, see `EXPERIMENT.md`. For Stage 9 fuzzing specifics, see
+`DYNAMIC-ANALYSIS-PLAN.md`.
+
+This file has two parts: **Part 1 — current stage checklist and
+how-to** (what stage things are at, right now), and **Part 2 —
+chronological log** (dated entries, the full history of how it got
+there, including debugging detail). Part 1 is kept current as stages
+progress; Part 2 is append-only.
 
 ---
+
+# Part 1 — Stage checklist and how-to
+
+## Stage 0 — Environment setup — done
+
+```bash
+sudo apt update
+sudo apt install build-essential clang llvm git python3 python3-pip binwalk
+```
+Ghidra installed separately (manual download, not via apt).
+
+## Stage 1 — CVE ground-truth benchmark — done
+
+5 BusyBox CVEs, one per memory-safety bug class, each verified directly
+against the real fixing commit. `samples/index.csv` is the ground-truth
+index; `samples/<cve>/info.md` documents each one.
+
+## Stage 2 — LLVM IR — done, now the fallback representation
+
+```bash
+clang -S -emit-llvm -g -O0 <file.c> -o <file.ll>
+```
+`ir/<sample>/{vulnerable,patched}.ll`. The Tier A preparer uses it only
+when pseudo-code is missing and extracts the target function rather than
+sending the whole LLVM module.
+
+## Stage 3 — Compile, strip, decompile the 5 samples — done
+
+`binaries/<sample>/{vulnerable,patched}` (linked, stripped executables) →
+`pseudo-code/<sample>/{vulnerable,patched}.c` (Ghidra decompiled). 4 full
+vulnerable/patched pairs + `CVE-2021-42386`'s intentional pseudo-C
+vulnerable-only case (the fix removes the source-level function; Tier A
+uses the small function-only LLVM fallback for the patched variant).
+
+## Stage 4 — Tier A prompt and rubric design — done
+
+The canonical implementation is `classify-function-vulnerabilities/`.
+It combines a common isolated-function prompt scaffold with one reviewed
+rubric per vulnerability class and requests strict JSON with a
+three-valued verdict, confidence, evidence, and reasoning. The legacy
+root prompt templates and model registry were removed so they cannot be
+mistaken for the active methodology.
+
+## Stage 5 — Tier A automated benchmark — done
+
+The skill prepares the full 5 samples × 2 variants × 6 classes = 60-task
+manifest, validates input size and provenance, projects cost without API
+calls, and executes only after approval under a hard cumulative ceiling.
+The completed run used a $5 ceiling and a conservative local ledger of
+$1.889030. Each experiment is stored under
+`results/tier-a/runs/<run-id>/`:
+
+- `README.md` and `run-metadata.json`: date, model, reasoning, notes, and
+  configuration differences from the previous experiment
+- `manifest.jsonl`: immutable task definitions and prompt hashes
+- `manifest-summary.json`: input, token, guard, and projected-cost totals
+- `results.jsonl`: append-only attempts, responses, and cumulative cost inputs
+- `scoring/scoring.csv`: one final scored row per manifest task
+- `scoring/summary.json` and `scoring/paired-transitions.csv`: aggregate and
+  paired evaluation
+
+Preparation refuses an existing run ID. Model, reasoning effort, output cap,
+transport mode, SDK retry setting, policy/prompt/schema versions, and pricing
+are frozen per run. Pairwise comparisons are written under
+`results/tier-a/comparisons/` with metric deltas and task-level verdict/category
+changes.
+
+Five 2026-07-20 uniform-high follow-up experiments are preserved separately.
+Policies v4/v5 stopped at 9/27 valid tasks because output
+caps were exhausted. Policy v6 reached 46 valid tasks but had unaudited SDK
+retries and connection errors. Policy v7 background polling reached 26 valid
+tasks, then stopped when one response reported 27,565 output tokens despite a
+4,500-token cap. Policy v8 replaces background polling with synchronous SSE
+streaming and zero SDK retries. Its immutable 60-task run is preserved at
+`results/tier-a/runs/2026-07-20t111012z__gpt-5-6-sol__high__high-4500-usd10-streaming/`;
+all tasks received one attempt, producing 53 valid responses and 7 explicit
+stream-completion errors. Its conservative ledger is $3.374440 under the
+isolated $10 ceiling. The run is scored and compared with the recovered
+baseline, but the failures and simultaneous configuration changes mean it
+does not support a clean reasoning-effort claim.
+
+## Stage 6 — Tier A analysis and write-up — done
+
+All 60 tasks produced valid structured outputs and were scored. The
+summary reports detection, specificity, abstention/indeterminate counts,
+variant-pair behavior, and per-class metrics. See `results/README.md` and
+the 2026-07-18 entries in `LOG.md` for exact interpretation and caveats.
+
+## Stage 7 — Real firmware Tier B ground truth — prepared; package incomplete
+
+CVE-2016-6277 (Netgear R6400/R7000 command injection) is documented in
+`firmware/CVE-2016-6277-netgear-r6400/info.md`. The repository retains
+selected vulnerable/patched pseudo-code and ground-truth metadata for:
+
+- candidate function: `netgear_commonCgi`
+- specific entry point: `parse_http_request`
+- expected path: `parse_http_request` → `handle_get` → `netgear_commonCgi`
+
+This material is a future Tier B case, not a runnable blind-discovery
+benchmark. The generic protocol-v6 Tier B skill, runner, and scorer now exist,
+but this Netgear sample still needs a complete analyzed codebase package and
+case-specific costed manifest. Binary selection and unknown-candidate
+discovery remain out of scope.
+
+## Stage 8 — Recall-first codebase filtering — done (LLM cascade); static-tools augmentation done, 2 cases accepted as limitations
+
+Approved by supervisor 2026-07-17. Two-tier pipeline; the function-level
+tier is confirmed correct as already built:
+
+- **Tier A (function-level, methodology already built = Stage 1-5) —
+  complete**: given one function in isolation,
+  classify whether it looks vulnerable. The *approach* is confirmed
+  correct as-is — the old hand-written scripts were removed and
+  regenerated by Codex as a proper skill,
+  `classify-function-vulnerabilities/` (repo root; see `SKILL.md`
+  there). Built from a written skill brief + a prompt asking Codex to
+  summarize its own design before generating any code (see `LOG.md`,
+  2026-07-17). Independently verified (not just taken from Codex's
+  self-report): 60 tasks (5 samples × 2 variants × 6 classes), hard $5
+  spend ceiling enforced both pre-flight and per-request, refusal/
+  invalid-output detection that aborts immediately instead of writing
+  silent empty results, and — the actual fix for the 2026-07-15
+  runaway-spend root cause — LLVM IR inputs now extracted down to just
+  the target function instead of whole modules (`CVE-2021-42386`'s
+  patched `.ll`: 1,081,065 → 611 bytes). The real run completed on
+  2026-07-18 with 60/60 valid results; final scoring and the audited cost
+  ledger are in
+  `results/tier-a/runs/2026-07-18__gpt-5-6-sol__mixed-recovered/` (see
+  `LOG.md` for metrics and recovery details).
+- **Tier B (codebase-level, new)**: given the *whole* codebase plus one
+  already-flagged candidate function, determine whether that function
+  is *actually* vulnerable by tracing reachability from **one specific
+  entry point** through the codebase — confirming the flagged function
+  is genuinely reachable/exploitable from that entry point, not just
+  pattern-matched in isolation. Tier B assumes the candidate function is
+  already known (from Tier A, or from ground truth like Stage 6/7's
+  `netgear_commonCgi`) and narrows to *confirming* it, not discovering
+  an unknown vulnerability from scratch across an entire binary.
+
+Evaluation order is fixed by `EXPERIMENT.md`:
+
+1. Keep Tier A's strict three-way scoring; an `indeterminate` result remains
+   an abstention.
+2. Evaluate Tier B independently using all five known BusyBox candidates and
+   their patched controls (up to 10 cases), with one entry point and a
+   reproducible whole-codebase package per case.
+3. Evaluate the operational cascade separately by forwarding Tier A
+   `vulnerable ∪ indeterminate`, deduplicating compatible candidates, and
+   measuring end-to-end recall, specificity, false-positive survival, and
+   Tier B workload.
+
+The protocol-v6 MVP is implemented in
+`confirm-and-filter-vulnerabilities/`. It includes:
+
+- exact-case Tier A ingestion keyed by artifact-scoped function UID and class,
+  with evidence-union coalescing and complete raw-row audit maps;
+- quarantine instead of silent loss for ambiguous or conflicting identity;
+- Ghidra Program Model export of analyzed function identities, direct calls,
+  and explicit unresolved indirect-call sites;
+- hash-verified packages and model tools;
+- proof-gated `retain_confirmed`, `suppress_proven_false_positive`, and
+  `retain_and_escalate` routing;
+- immutable no-API preparation, explicit manifest-bound approval, adaptive
+  but bounded investigation limits, append-only execution, and scoring.
+
+The redesigned skill's six-case pilot confirmed 2/4 real vulnerabilities,
+correctly suppressed 1 genuine Tier A false positive, and honestly
+retained 3 cases as capability-gap limitations (deferred range/data-flow
+analysis; see `results/OVERALL_RESULTS.md`, "Known limitations").
+
+Per supervisor direction (tolerate function-level FNs if the codebase
+level catches them; use fuller Ghidra output plus agent-orchestrated
+def-use/slicing/dominance/call-graph tools and targeted angr rather than
+building a new static-analysis framework), a second skill,
+`confirm-and-filter-vulnerabilities-static/`, was built as a separate
+fork (original left untouched) adding those four tools plus an
+exact-row `--force-include` mechanism that pulled the one Tier A
+false negative (CVE-2021-42386 UAF) into Tier B for the first time.
+Three verified rounds (protocol v9-v11) each fixed a distinct root
+cause (tools never invoked → framing/retry-budget gaps → a narrow
+scheduling bug and a persistent provider-side `cyber_policy`
+rejection). CVE-2017-15873 and CVE-2021-42374 are now accepted as
+static-analysis-stage limitations (see `results/OVERALL_RESULTS.md`,
+"Tier B static rounds: known limitations") — resolution deferred to
+Stage 9. CVE-2021-42386's static result already stands as a complete,
+non-starved attempt (all 4 tools exhausted, angr timed out).
+
+## Stage 9 — Dynamic analysis confirmation — in progress
+
+Fuzzing pass to confirm/find what Tier B's static stages could not —
+closes the loop on the project's original hybrid static + dynamic
+framing. Full design in `DYNAMIC-ANALYSIS-PLAN.md`; harnesses and
+campaign results per CVE live under `dynamic-analysis/<cve>/`.
+
+Methodology: a blind two-phase LLM seed-generation process (Phase 1 —
+an isolated subagent with no vulnerability framing extracts field
+structure/boundary values from spec or code; Phase 2 — seeds built
+mechanically from that extraction) feeds AFL++ ASAN-instrumented
+harnesses, one per CVE, built by recompiling only the target source
+file with the rest of the pre-built BusyBox object graph. Every crash
+is only reported confirmed if it reproduces on the vulnerable binary
+and is absent on a freshly-built patched binary with the identical
+input — never a raw crash count alone.
+
+Status (see `dynamic-analysis/LLM-SEED-TIMING.md` for exact timings,
+`results/OVERALL_RESULTS.md`'s "Full pipeline status per CVE" table for
+the live per-case summary):
+
+- **3/5 confirmed**: CVE-2026-29004 (udhcpc6, ~19 min), CVE-2021-42373
+  (man, ~96s), CVE-2021-42374 (unlzma, ~82 min) — the latter two are
+  also this stage's Priority-1 cases, since Tier B could not resolve
+  them either.
+- **CVE-2017-15873 (bunzip2)**: not found in ~2.3h; separately
+  documented as structurally infeasible via any real (non-malformed-
+  bitstream) compressed input, not a search-effort shortfall.
+- **CVE-2021-42386 (awk)**: not found in ~31.7h; this is Stage 9's
+  lowest-priority "special case" (does dynamic analysis catch something
+  static analysis missed at every stage), not its primary purpose — see
+  `DYNAMIC-ANALYSIS-PLAN.md` Section 2. Every crash class found was
+  triaged and ruled out, including one genuine but off-target heap-UAF
+  identified as the distinct, already-fixed CVE-2023-42363.
+
+Next: a random-seed baseline comparison (per supervisor request,
+isolating seed-generation strategy as the only variable — see
+`BASELINE-FUZZING-STEPS.md`), then, time permitting, a static-analysis-
+guided seed-generation variant.
+
+## Working method for Stage 8: Codex-based skill automation
+
+Per supervisor guidance: build Stage 8 using Codex in VS Code (full
+repo context available to the agent), rather than hand-writing
+prompts/scripts the way Stage 1-5 was built. Same approach reused for
+the Stage 8 static-tools augmentation (`confirm-and-filter-
+vulnerabilities-static/`): a reviewed prompt specifying the new skill
+be built as a separate fork (never modifying the original in place),
+with each round's self-reported results independently re-verified
+against actual code, tests, and manifest hashes before approving the
+next paid run.
+
+1. Treat the completed `classify-function-vulnerabilities/` skill and
+   `results/tier-a/` outputs as the Tier A baseline.
+2. Summarize and review a separate Tier B skill before implementation,
+   fixing the candidate, entry point, permitted whole-codebase context,
+   output schema, evaluation rules, and spending safeguards.
+3. Generate Tier B automation from that reviewed definition, then create
+   a no-API dry-run manifest and cost projection for explicit approval.
+
+Branches used across this stage: `W3/codebase-level-redesign` (initial
+Tier B redesign), `W3/dynamic-analysis-fuzzing` (current, Stage 9).
+
+## Future possibilities
+
+**Containerize the environment (Docker).** Not needed for the current
+one-machine workflow, but worth doing if this pipeline needs to be
+reproduced elsewhere (another machine, the mentor's own setup, or a
+future continuation of this project) — several real problems this
+project hit were specifically *environment* problems, not logic bugs:
+- The BusyBox build needed a minimal Kconfig specifically to dodge
+  legacy-applet failures against this host's modern kernel headers/glibc
+  (`networking/tc.c`, `rdate`'s `stime()`) — a pinned older base image
+  would avoid needing that workaround at all.
+- The scratchpad holding intermediate build state got wiped between
+  sessions multiple times, forcing repeated re-cloning/re-building — a
+  container with a mounted volume would make that state durable and
+  explicit instead of implicit and fragile.
+- Several scripts and this doc currently reference this machine's
+  absolute paths (`/home/valentinarossi/...` for the Ghidra install and
+  project) — a container would make setup reproducible on any machine
+  without hand-editing paths.
+- The headless Ghidra pipeline (`analyzeHeadless` + `ExportAllFunctions.java`)
+  is a natural fit for a container — no GUI needed, and the exact Ghidra
+  version matters (the Jython→PyGhidra change between versions was a real
+  issue hit this project; pinning a specific Ghidra version in an image
+  avoids that class of surprise entirely).
+
+Not pursuing now since it would take real time away from the actual
+research question for a one-machine, one-person project on a one-month
+timeline — but a reasonable next step if this needs to be shared,
+reproduced, or handed off.
+
+## Immediate next actions
+
+1. Run the random-seed baseline fuzzing campaigns for all 5 cases (see
+   `BASELINE-FUZZING-STEPS.md`), matching each case's LLM-seeded run
+   time, then document and compare against
+   `dynamic-analysis/LLM-SEED-TIMING.md`.
+2. Time permitting, a static-analysis-guided seed-generation variant
+   (using the Stage 8 static-tools skill's Ghidra/angr output to target
+   seed construction) for the two still-unconfirmed cases.
+3. Fold the baseline comparison into `results/OVERALL_RESULTS.md`'s
+   per-CVE pipeline table once complete.
+
+---
+
+# Part 2 — Chronological log
+
+Does not reference git commit hashes.
+
+---
+
 
 ## 2026-07-11 — Samples 1-5: BusyBox CVE benchmark built
 
@@ -795,3 +1105,160 @@ summaries (function-level, codebase-level) to hand to Codex.
   Planning cost is approximately $9.86 per case, $49.30 for five positives, or
   $98.60 for ten cases; exact cost must be recomputed from frozen real
   packages before any approval. No provider API calls were made.
+
+## 2026-07-24/26 — Tier B redesigned as `confirm-and-filter-vulnerabilities`; six-case pilot
+
+- Replaced the oracle-only `confirm-vulnerability-reachability` skill
+  (protocol v3-v6, only ever evaluated pre-selected known-answer pairs)
+  with a new design: confirming every forwarded true positive is the
+  hard, primary constraint; reducing false positives is secondary and
+  must never weaken confirmation. A case that can't be cleanly resolved
+  is retained and passed downstream, not dropped.
+- Six-case pilot (2 schema-fix runs, schema-v2 then schema-v3) against
+  a real frozen Tier A run: **2/4 real vulnerabilities confirmed
+  (CVE-2026-29004, CVE-2021-42373), 1 genuine Tier A false positive
+  correctly suppressed with a full evidentiary proof, 3 cases honestly
+  retained** as capability-gap limitations (deferred range/data-flow
+  analysis — no SSA, dominators, def-use slicing, or symbolic range
+  analysis in this MVP). No true positive was ever suppressed.
+- Real bugs found and independently fixed along the way (not accepted
+  on self-report): two Structured Outputs schema-validity bugs; a
+  validator status-conflation bug that discarded a genuinely correct
+  CVE-2021-42373 confirmation; a real false suppression on
+  CVE-2021-42374 (a guard proven for one buffer read wrongly applied to
+  a different unguarded read); a runner bug silently discarding valid
+  interim "still unresolved" answers instead of persisting them; an
+  unsupported inferential leap accepted without evidence; a generic,
+  undiagnosable terminal-response exception conflating token-cap
+  exhaustion, provider refusals, and genuine transport failures. Full
+  detail in `results/OVERALL_RESULTS.md`, "Tier B redesign" section.
+- Recurring `cyber_policy` provider content-safety refusals on
+  genuinely vulnerable code first hit here — mitigated (not
+  eliminated) by reinforcing explicit defensive, symbolic-only framing.
+  This exact failure class recurs throughout Stage 8's static-tools
+  work below.
+
+## 2026-07-27/28 — Stage 9 (dynamic analysis) begins: 5 AFL++ harnesses, first confirmations
+
+- Built one standalone AFL++/ASAN harness per CVE
+  (`dynamic-analysis/<cve>/harness_*.c`), each recompiling only the
+  target source file with the rest of the pre-built, non-instrumented
+  BusyBox object graph — no source patches to the target files
+  themselves. `udhcpc6` and `man` use compiler-flag entry-point renames
+  (`-Dmain_fn=main_fn_impl`); `man` additionally needs
+  `utils/argv_fuzzing/argv-fuzz-inl.h` for argv fuzzing.
+- **CVE-2026-29004 (udhcpc6) confirmed**: initial hand-crafted-seed
+  "confirmation" explicitly critiqued (built with knowledge of the bug,
+  not real fuzzing evidence) — redone with a genuinely blind two-phase
+  LLM seed methodology (Phase 1: an isolated subagent with no
+  vulnerability framing extracts field structure/boundary values from
+  spec/code; Phase 2: seeds built mechanically from that extraction,
+  no further vulnerability-aware judgment). Verified against the actual
+  LLMIF paper (Section 4, page 884) rather than assumed. Blind campaign
+  found 7/7 crashes, identical signature, absent on patched — ~19 min.
+- **CVE-2021-42373 (man) confirmed** the same way: 9 blind argv shapes,
+  crash in ~96s/845 execs, absent on patched.
+- Real harness/methodology bugs found and fixed: AFL++ dictionaries
+  need quoted byte values (`name="\x.."`, not `name=\x..`) — silently
+  failed to load otherwise, cost ~53 min on the unlzma campaign before
+  caught; the shared `bb_show_usage()` linker stub called `abort()`,
+  turning normal "invalid option" behavior into false-positive crashes
+  in any harness reaching `getopt32` (man, awk) — fixed to `_exit(2)`
+  in all 5 harnesses.
+
+## 2026-07-28/29 — Remaining harnesses; bunzip2 structural infeasibility; supervisor guidance pivot
+
+- **CVE-2021-42374 (unlzma) confirmed** via the full blind methodology
+  (82 min, 187,274 execs, cross-checked absent on patched) — supersedes
+  an earlier informal (non-blind-methodology) find from the same crash
+  offset.
+- **CVE-2017-15873 (bunzip2)**: determined via precise `int32`
+  accumulation simulation that the specific `runCnt`/`dbufCount`
+  overflow trigger needs ~1043 consecutive RUNB symbols — a value
+  `dbufSize`'s 900,000-byte hard cap makes structurally unreachable by
+  any real, standards-conforming compressor regardless of input size.
+  Only a hand-crafted malformed bitstream reaches it. Explicitly
+  scoped out of legitimate fuzzing methodology, not pursued as a PoC.
+- **CVE-2021-42386 (awk)**: blind taxonomy extraction found 7
+  call-nesting shapes; original 5 seeds only covered 2. Round 2 added 3
+  more seed scripts covering the untested categories (self-referential
+  call in argument position, mutual recursion, sibling-argument calls),
+  injected directly into the running campaign's `queue/` (AFL only
+  reads `-i` once at startup). `print > "file"` redirection found to
+  let any script write arbitrary files relative to the harness's cwd,
+  ungated — created 1,187 junk files during triage; fixed practice to
+  always run from a disposable scratch directory.
+- Supervisor's reply on the six-case pilot's 3 retained cases: tolerate
+  function-level FNs as long as the codebase level catches them; do
+  **not** build a new static-analysis framework — instead use fuller
+  Ghidra output plus agent-orchestrated def-use/slicing/dominance/
+  call-graph tools and targeted angr, and document genuine limitations
+  rather than invent new algorithms; requested a random-seed baseline
+  for dynamic analysis and a cross-stage results table. Own review
+  caught the ingestion pipeline's `--forward-verdict` default was
+  silently excluding the one known Tier A false negative
+  (CVE-2021-42386 UAF) from ever reaching Tier B — fixed via a new
+  `--force-include` exact-row selector, not a broadened verdict filter.
+
+## 2026-07-29/30 — Static-tools Tier B skill (3 verified Codex rounds); awk overnight campaign
+
+- New skill `confirm-and-filter-vulnerabilities-static/` built as a
+  separate fork (original `confirm-and-filter-vulnerabilities/` left
+  completely untouched — verified via `git diff`), adding
+  `get_reaching_definitions`, `slice_pcode`, `get_dominance`,
+  `query_angr`, fuller Ghidra p-code/CFG exports, and the
+  `--force-include` ingestion mechanism. Narrowed to 3 primary cases
+  (bunzip2, unlzma, awk vulnerable); patched control deprioritized.
+- **Round 1** (protocol-v9, static-primary): 0/3 confirmations. Own
+  audit of `results.jsonl`'s `tool_name` field found the 3 new tools
+  were built but never actually invoked (only `get_reaching_definitions`
+  once) — the investigation converged early on the old tool set alone.
+- **Round 2** (protocol-v10, required-tools rerun): added a required-tool
+  coverage gate blocking any case from a "completed" terminal until all
+  4 tools succeed at least once, plus a per-request (not once-only)
+  defensive reminder. UAF case genuinely exhausted all 4 tools (angr
+  timed out) — a complete, non-starved result. OOB hit `cyber_policy`
+  before any tool call; integer-overflow exhausted its base budget on
+  retries before dominance/angr.
+- **Round 3** (protocol-v11, two-case round): fixed the retry-budget
+  starvation for oversized-result retries specifically, and confirmed
+  uniform defensive framing on every request. Verified via raw
+  `results.jsonl`: OOB reached 3/4 tools before a *different*,
+  narrower bug (an invalid-argument retry, not oversized-result, ate
+  the final slot); integer-overflow's oversized-slice retry correctly
+  unlocked the extension, then the next request still hit
+  `cyber_policy` despite uniform framing. Since this is now a
+  provider-side content-safety rejection outside prompt/scheduling
+  control, and not a fixable mechanical gap, **CVE-2017-15873 and
+  CVE-2021-42374 accepted as static-analysis-stage limitations** — see
+  `results/OVERALL_RESULTS.md`, "Tier B static rounds: known
+  limitations." No further static-tools rounds planned for these two.
+- Overnight awk blind campaign (~31.7h, 1.59M execs, 40 cycles): 19
+  crashes triaged. One genuinely new class — `heap-use-after-free` in
+  `clrvar` (awk.c:917) — found and traced via `addr2line` through a
+  `split_f0`/`Fields[]` realloc chain, then **reproduced identically on
+  patched source**, ruling it out as CVE-2021-42386. Identified via
+  upstream git history as a distinct, already-fixed bug,
+  **CVE-2023-42363** (fix `fb08d43d4`, May 2024 — postdates both our
+  checkouts): the fix comment's own description ("second `evaluate()`
+  reallocates and moves `Fields[]`... L.v now points to freed mem")
+  matches the traced chain almost verbatim, and the crash input
+  contains a large field reference (`$222222`) matching upstream's own
+  `"$444 $44444"` repro. Not a zero-day; target UAF still unconfirmed.
+- Wrote `dynamic-analysis/LLM-SEED-TIMING.md` (exact time/execs-to-crash
+  per case, from `fuzzer_stats`/crash-file timestamps, not estimated)
+  and `BASELINE-FUZZING-STEPS.md` (steps for the supervisor-requested
+  random-seed baseline: same harness/timeout, no dictionary, isolating
+  seed-generation strategy as the only variable).
+- 5-slide `presentations/W3_progress.pptx` built for a progress
+  update, iterated per feedback (terminology, arrow/box relabeling,
+  schematic results layout).
+- Repo cleanup: removed an empty scratch file; gitignored the large
+  (111M) untracked static-analysis run-input packages (regenerable
+  from manifest-recorded case IDs, immutable outputs stay committed);
+  documented (not archived — the versioned filenames are load-bearing
+  for `tier_b_common.py`'s exact-version policy/prompt loader) the
+  version sprawl in `confirm-vulnerability-reachability/references/`;
+  merged this file (`LOG.md`) and `PLAN.md` into one, since they'd
+  grown redundant to cross-reference and `PLAN.md`'s Stage 8/9 sections
+  were badly stale.

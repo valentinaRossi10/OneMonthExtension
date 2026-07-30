@@ -4,7 +4,7 @@ Compiled, linked, stripped ELF executables for each sample, one
 `vulnerable` / `patched` pair per CVE, mirroring `samples/` and `ir/`.
 
 These are the input to Stage 3's decompilation step (Ghidra) — see
-`PLAN.md` and `LOG.md` for the full pipeline and reasoning.
+`LOG.md` for the full pipeline and reasoning.
 
 ## How these were produced
 

@@ -16,3 +16,12 @@ firmware/**/extracted/
 # (binaries/tier-b/) — reproducible from the commit hashes recorded in
 # each PROVENANCE.md, not committed themselves.
 dataset/
+
+# Tier B static-analysis run inputs (Ghidra p-code/CFG exports, angr
+# query staging) — large, regenerable from the manifest/case IDs
+# recorded in each results/tier-b/filter-runs/*/manifest-summary.json.
+# The immutable run outputs (results.jsonl, manifest-summary.json,
+# tool-coverage-audit.json, scoring/) are committed; the raw packages
+# that produced them are not.
+results/tier-b/static-packages/
+results/tier-b/static-preparation/

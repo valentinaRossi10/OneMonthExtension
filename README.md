@@ -4,9 +4,9 @@ Research project evaluating LLM-based static analysis as one half of a
 hybrid static + dynamic vulnerability-detection pipeline for IoT firmware.
 
 Start with [`EXPERIMENT.md`](EXPERIMENT.md) for the canonical experimental
-protocol, [`PIPELINE.md`](PIPELINE.md) for methodology and rationale,
-[`PLAN.md`](PLAN.md) for current status and next steps, and [`LOG.md`](LOG.md)
-for chronological history.
+protocol, [`PIPELINE.md`](PIPELINE.md) for methodology and rationale, and
+[`LOG.md`](LOG.md) for current status/next steps (Part 1) and full
+chronological history (Part 2).
 
 ## Current methodology and status
 
@@ -16,18 +16,25 @@ for chronological history.
   full 5 samples x 2 variants x 6 classes cross-product. The recovered baseline
   completed and scored all 60 tasks under a hard cumulative $5 ceiling. Later
   uniform-high experiments are preserved separately as stopped partial runs.
-- **Tier B — historical oracle confirmation plus recall-first redesign.**
-  Historical protocol-v3/v4/v5 runs are preserved under `results/tier-b/`.
-  The new `confirm-and-filter-vulnerabilities/` MVP ingests real Tier A output,
-  coalesces only exact artifact-scoped function/class duplicates, packages
-  Ghidra program-model call facts, and suppresses a case only after a complete
-  rejection proof. All unresolved or failed cases remain retained for
-  escalation. No redesign run has been executed yet.
+- **Tier B — historical oracle confirmation plus recall-first redesign:
+  complete, with 2 cases accepted as documented limitations.** Historical
+  protocol-v3/v4/v5 runs are preserved under `results/tier-b/`. The
+  `confirm-and-filter-vulnerabilities/` MVP's six-case pilot confirmed 2/4
+  real vulnerabilities, correctly suppressed 1 genuine Tier A false
+  positive, and retained 3 cases as capability-gap limitations. A second
+  skill, `confirm-and-filter-vulnerabilities-static/`, added agent-
+  orchestrated def-use/slicing/dominance tools and targeted angr across 3
+  verified rounds; CVE-2017-15873 and CVE-2021-42374 are now accepted as
+  static-analysis-stage limitations (resolution deferred to Stage 9);
+  CVE-2021-42386's static result already stands as a complete attempt (all
+  required tools exhausted, angr timed out).
 - **Static handoff rule:** Tier A remains strictly scored, but both
   `vulnerable` and `indeterminate` cases advance to Tier B. Forwarding an
   abstention does not retroactively count it as a Tier A positive.
-- **Dynamic confirmation: not started.** Fuzzing follows Tier B to validate
-  confirmed findings.
+- **Dynamic confirmation (Stage 9): in progress.** Blind LLM-seeded AFL++
+  fuzzing per CVE — 3/5 confirmed (CVE-2026-29004, CVE-2021-42373,
+  CVE-2021-42374), 2/5 still under active fuzzing (CVE-2017-15873,
+  CVE-2021-42386). See `dynamic-analysis/README.md`.
 
 The Netgear CVE-2016-6277 material under `firmware/` currently establishes
 ground truth for a future Tier B case. It is not a runnable full-binary
@@ -40,7 +47,9 @@ discovery benchmark.
 | [`EXPERIMENT.md`](EXPERIMENT.md) | Canonical research questions, labels, handoff policy, evaluation matrices, metrics, and reporting boundaries |
 | [`classify-function-vulnerabilities/`](classify-function-vulnerabilities/SKILL.md) | Canonical Tier A skill, rubrics, schema, policy, and automation |
 | [`confirm-and-filter-vulnerabilities/`](confirm-and-filter-vulnerabilities/SKILL.md) | Recall-first Tier B MVP for real Tier A queue ingestion, Ghidra-backed packages, proof-gated filtering, execution, and scoring |
+| [`confirm-and-filter-vulnerabilities-static/`](confirm-and-filter-vulnerabilities-static/SKILL.md) | Tier B static-tools augmentation: def-use/slicing/dominance/angr, force-include |
 | [`confirm-vulnerability-reachability/`](confirm-vulnerability-reachability/SKILL.md) | Historical fixed-candidate Tier B oracle protocol and preserved run tooling |
+| [`dynamic-analysis/`](dynamic-analysis/README.md) | Stage 9 fuzzing: per-CVE AFL++/ASAN harnesses, blind seeds, campaign results |
 | [`samples/`](samples/README.md) | Verified vulnerable/patched BusyBox source ground truth |
 | [`binaries/`](binaries/README.md) | Linked and stripped BusyBox binaries used for decompilation |
 | [`pseudo-code/`](pseudo-code/README.md) | Primary Ghidra pseudo-C function inputs |
