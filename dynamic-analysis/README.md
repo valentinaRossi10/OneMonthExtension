@@ -20,10 +20,10 @@ One subdirectory per ground-truth case, each containing:
 | Case                     | Harness | Verified crash repro                                                                                                                                                                                                                        | Calibration run                                                       |
 | ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | CVE-2026-29004 (udhcpc6) | done    | **yes — via real blind-seeded exploration** (~19 min, 7/7 crashes cross-checked as fix-specific true positives; supersedes the earlier hand-crafted-seed confirmation). See `CAMPAIGN-RESULTS.md`                                           | yes (60s, no false positives)                                         |
-| CVE-2017-15873 (bunzip2) | done    | not yet — needs a longer/guided campaign, not a hand-craftable trigger                                                                                                                                                                      | yes (4 min, 80.42% coverage, 0 crashes, no false positives)           |
+| CVE-2017-15873 (bunzip2) | done    | not yet — ~2.3h blind campaign (242,043 execs, 0 crashes), separately shown **structurally infeasible via any real, standards-conforming compressed input** regardless of fuzz time (`dbufSize`'s 900,000-byte cap; real trigger needs ~1043 consecutive RUNB symbols only reachable via a hand-crafted malformed bitstream) | yes (4 min, 80.42% coverage, 0 crashes, no false positives)           |
 | CVE-2021-42374 (unlzma)  | done    | **yes — via the full blind methodology** (82 min combined, 187,274 execs, same crash offset as the earlier informal find; cross-checked absent on patched source). See `CAMPAIGN-RESULTS.md`                                                                                                                                     | yes (4 min, 83.50% coverage, 1 crash)                                 |
 | CVE-2021-42373 (man)     | done    | **yes — via real blind-seeded exploration** (96s, 9,844 execs, crash found immediately; cross-checked absent on patched source; supersedes the earlier hand-crafted-argv confirmation). See `CAMPAIGN-RESULTS.md`                           | yes (60s, 14,813 execs, 2 crashes, re-verified after linker-stub fix) |
-| CVE-2021-42386 (awk)     | done    | not yet — 21 crashes found in discovery campaign, all cross-checked and ruled out as unrelated to this CVE (19 stack-overflow + 1 unrelated SEGV, both also present on patched source); target UAF needs a more targeted (nested-call) seed | yes (4 min, 39,536 execs)                                             |
+| CVE-2021-42386 (awk)     | done    | not yet — ~31.7h overnight campaign (1,587,759 execs, 19 crashes), all triaged and ruled out (stack-overflow / `bb_perror_msg` SEGV / one off-target heap-use-after-free identified as the distinct, already-fixed **CVE-2023-42363**, reproducing identically on patched source); taxonomy-complete Round 2 seeds (self-referential, mutual-recursion, sibling-argument nesting) still didn't hit the target pool-allocator UAF | yes (4 min, 39,536 execs)                                             |
 
 **Found and fixed while building the awk harness**: the shared
 `bb_show_usage()` linker stub called `abort()`, turning ordinary
@@ -62,20 +62,30 @@ unless it's absent once the fix is applied.
   because `appletlib.o` (BusyBox's real `main()`) is deliberately
   excluded from every build.
 
-**Results, plainly stated:**
+**Results, plainly stated (as of 2026-07-30):**
 
 - **3 of 5 confirmed as true positives via dynamic analysis**:
   CVE-2026-29004, CVE-2021-42374, CVE-2021-42373 — each has a crash
   that reproduces on the vulnerable source and is absent (clean
   rejection) on the patched source with the identical input.
-- **2 of 5 not yet confirmed**: CVE-2017-15873 (bunzip2 — harness
-  works, no crash found yet, bug needs a specific Huffman/run-length
-  structure not reachable by blind mutation from one valid seed) and
-  CVE-2021-42386 (awk — harness works, 21 crashes found but all
-  cross-checked and ruled out as unrelated to this specific CVE; the
-  real UAF needs a *nested* function-call pattern in argument position,
-  confirmed not triggered by plain linear recursion).
-- **1 real methodology bug found and fixed along the way**: the
+- **2 of 5 not yet confirmed, both with substantial genuine search
+  effort behind the negative result**: CVE-2017-15873 (bunzip2 — ~2.3h,
+  242,043 execs, 0 crashes; the trigger is structurally unreachable by
+  any real compressed input, not a search-effort shortfall) and
+  CVE-2021-42386 (awk — ~31.7h, 1,587,759 execs, 19 crashes all
+  triaged and ruled out, including a real but off-target heap-UAF
+  identified as the distinct, already-fixed CVE-2023-42363; the target
+  pool-allocator UAF needs a narrower alloc/free interleaving than
+  blind mutation of the taxonomy-complete seed set has hit so far).
+- **Real methodology bugs found and fixed along the way**: the
   `bb_show_usage` stub inflating crash counts with normal usage-error
-  exits, caught specifically *because* of the patched-source
-  cross-check discipline, not by luck.
+  exits (caught by the patched-source cross-check discipline); AFL++
+  dictionaries silently failing to load on unquoted byte-value format;
+  and AWK's `print > "file"` redirection writing arbitrary files
+  relative to the harness's cwd, ungated — practice fixed by always
+  running `harness_awk` from a disposable scratch directory.
+
+See `../results/OVERALL_RESULTS.md` ("Full pipeline status per CVE")
+for the live cross-stage view, `LLM-SEED-TIMING.md` for exact
+time-to-crash figures, and `../BASELINE-FUZZING-STEPS.md` for the
+planned random-seed baseline comparison.
