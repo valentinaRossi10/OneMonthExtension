@@ -123,3 +123,34 @@ existing `CAMPAIGN-RESULTS.md` files), then fold the comparison numbers
 into `dynamic-analysis/LLM-SEED-TIMING.md` as a new "Random baseline"
 column once all 5 are done, and update `results/OVERALL_RESULTS.md`'s
 per-CVE pipeline table.
+
+## 7. If pure random can't pass a format's magic-byte/header gate
+
+Watch for AFL's own `last new find: none yet (odd, check syntax!)`
+warning combined with corpus count never growing past the initial seed
+count — that's a gate-passing failure, not evidence about the bug
+itself (seen on CVE-2017-15873/bunzip2: 2.10% coverage, corpus stuck at
+3 seeds across 45 cycles). It conflates two different questions ("can
+the fuzzer build a well-formed file of this type" vs. "can it find the
+dangerous shape inside one") into one misleading "random found nothing"
+result.
+
+Add a third condition to separate them: seeds that are **format-valid
+but content-random**, built mechanically with the real tool for that
+format (not the LLM extraction, not hand-picked around the known bug):
+
+```bash
+DA=/home/valentinarossi/Scrivania/UNI/POLYU/IRSS/repo/OneMonthExtension/dynamic-analysis
+mkdir -p "$DA/<case>/seeds-random-valid"
+head -c 256   /dev/urandom | bzip2 -c > "$DA/<case>/seeds-random-valid/valid_random_1.bz2"
+head -c 2048  /dev/urandom | bzip2 -c > "$DA/<case>/seeds-random-valid/valid_random_2.bz2"
+head -c 16384 /dev/urandom | bzip2 -c > "$DA/<case>/seeds-random-valid/valid_random_3.bz2"
+
+ASAN_OPTIONS=symbolize=0:abort_on_error=1:detect_leaks=0 AFL_SKIP_CPUFREQ=1 \
+  afl-fuzz -m none -i "$DA/<case>/seeds-random-valid" -o "$DA/<case>/out-random-valid" \
+  -- /home/valentinarossi/afl-harnesses/<case>/<harness_binary>
+```
+
+Document as `CAMPAIGN-RESULTS-RANDOM-VALID.md`; see
+`dynamic-analysis/cve-2017-15873/CAMPAIGN-RESULTS-RANDOM-VALID.md` for
+the worked example.
