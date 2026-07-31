@@ -1,6 +1,6 @@
 # Overall pipeline results
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 
 This is the human-readable progress dashboard for the experiment. The
 normative methodology remains in [`EXPERIMENT.md`](../EXPERIMENT.md), and the
@@ -21,7 +21,7 @@ they are not pooled into a synthetic five-pair matrix score.
 | Complete five-pair Tier B oracle matrix | **Not completed** | Historical pilot and versioned follow-ups cannot be pooled as one matrix |
 | Tier B redesign (`confirm-and-filter-vulnerabilities`) six-case pilot | Completed | 2/4 real vulnerabilities confirmed, 1 true negative correctly suppressed, 3 cases retained as documented capability-gap limitations |
 | Tier A → Tier B cascade | **Not executed** | No end-to-end pipeline accuracy or recall can be claimed yet |
-| Dynamic-analysis validation | **In progress** | 3/5 confirmed via genuine blind-seeded fuzzing (CVE-2026-29004, CVE-2021-42373, CVE-2021-42374); 2/5 in progress — see "Full pipeline status per CVE" below |
+| Dynamic-analysis validation | **In progress** | 3/5 confirmed via genuine blind-seeded fuzzing (CVE-2026-29004, CVE-2021-42373, CVE-2021-42374); random-seed baseline comparison run for 4/5 (mixed result — see below); awk campaign still running |
 
 ## Tier A outcome counts
 
@@ -359,13 +359,19 @@ crash (reproduces on vulnerable, absent on patched with the identical
 input) unless explicitly marked otherwise — a raw crash count alone is
 never reported here as a confirmation.
 
-| CVE (bug class) | Tier A (function-level) | Tier B (latest applicable codebase-level result) | Dynamic analysis |
-|---|---|---|---|
-| CVE-2026-29004 (heap-buffer-overflow, udhcpc6) | TP confirmed | Confirmed | **Confirmed** — blind-seeded AFL campaign, cross-checked absent on patched |
-| CVE-2017-15873 (integer-overflow, bunzip2) | TP confirmed | **Accepted limitation** — retained unresolved after 3 verified static-tools rounds (v9-v11); root cause is now a provider-side `cyber_policy` rejection persisting despite uniform defensive framing, not a fixable prompt/scheduling gap | Not yet confirmed; structurally documented as infeasible via genuine compression (only a hand-crafted malformed bitstream reaches the overflow) — out of scope by explicit direction |
-| CVE-2021-42373 (NULL-deref, man) | TP confirmed | Confirmed (vulnerable); patched variant correctly suppressed as the pilot's true-negative control | **Confirmed** — blind-seeded AFL campaign, cross-checked absent on patched |
-| CVE-2021-42374 (OOB-read, unlzma) | Abstained (buffer size set in a callee outside the isolated function — a correct "can't tell," not a wrong answer) | **Accepted limitation** — retained unresolved after 3 verified static-tools rounds (v9-v11); reaching-definitions, slicing, and dominance completed, but a required-tool argument-retry bug consumed the slot needed by angr | **Confirmed** — full blind-methodology campaign (82 min, 187,274 execs), same crash offset as the earlier informal find, cross-checked absent on patched |
-| CVE-2021-42386 (use-after-free, awk) | Missed entirely (function-local visibility — the free/stale-reference/reuse sequence spans multiple functions) | Force-included into static-v2 Tier B; all four required tools genuinely exhausted (v10), bounded angr timed out — a complete, non-starved retained result | Not yet confirmed — ~31h blind campaign, several unrelated crash classes found and ruled out, including a genuine but off-target heap-UAF identified as the distinct, already-fixed CVE-2023-42363; this is Stage 9's lowest-priority "special case" test, not its primary purpose (see `../DYNAMIC-ANALYSIS-PLAN.md` Section 2) |
+| CVE (bug class) | Tier A (function-level) | Tier B (latest applicable codebase-level result) | Dynamic analysis (blind LLM-seeded) | Dynamic analysis (random-seed baseline) |
+|---|---|---|---|---|
+| CVE-2026-29004 (heap-buffer-overflow, udhcpc6) | TP confirmed | Confirmed | **Confirmed** — cross-checked absent on patched (~373s, 81,087 execs to first crash) | **Confirmed** — same signature, absent on patched, actually **faster** than blind (~93s, 14,255 execs) |
+| CVE-2017-15873 (integer-overflow, bunzip2) | TP confirmed | **Accepted limitation** — retained unresolved after 3 verified static-tools rounds (v9-v11); root cause is now a provider-side `cyber_policy` rejection persisting despite uniform defensive framing, not a fixable prompt/scheduling gap | No crash in ~2.3h (242,043 execs, 85.31% coverage); structurally documented as infeasible via genuine compression | No crash in either condition: pure random stuck at the format's magic-byte gate (2.10% cov., ~19min); a 3rd, format-valid-random condition (real-bzip2-compressed random content) reached 84.62% coverage (~15.7h, ~4M execs) — essentially the same ceiling as blind — and still found nothing. All 3 strategies now agree the trigger is unreachable by undirected search |
+| CVE-2021-42373 (NULL-deref, man) | TP confirmed | Confirmed (vulnerable); patched variant correctly suppressed as the pilot's true-negative control | **Confirmed** — cross-checked absent on patched (~5.7s, 845 execs to first crash) | **Confirmed** — same signature, absent on patched, but much slower (~72s, 15,941 execs — blind was ~12.6x faster here) |
+| CVE-2021-42374 (OOB-read, unlzma) | Abstained (buffer size set in a callee outside the isolated function — a correct "can't tell," not a wrong answer) | **Accepted limitation** — retained unresolved after 3 verified static-tools rounds (v9-v11); reaching-definitions, slicing, and dominance completed, but a required-tool argument-retry bug consumed the slot needed by angr | **Confirmed** — full blind-methodology campaign (82 min, 175,710 execs to first crash), cross-checked absent on patched | No crash in ~16.3h (4,538,490 execs) despite reaching the **identical coverage ceiling** as blind (83.50% both) — a target-value search-efficiency gap, not a reachability gap |
+| CVE-2021-42386 (use-after-free, awk) | Missed entirely (function-local visibility — the free/stale-reference/reuse sequence spans multiple functions) | Force-included into static-v2 Tier B; all four required tools genuinely exhausted (v10), bounded angr timed out — a complete, non-starved retained result | Not yet confirmed — ~51.6h blind campaign as of 2026-07-31 (6.1M execs, 30 crashes / 9 hangs), all triaged and ruled out, including a genuine but off-target heap-UAF identified as the distinct, already-fixed CVE-2023-42363; this is Stage 9's lowest-priority "special case" test, not its primary purpose (see `../DYNAMIC-ANALYSIS-PLAN.md` Section 2) | Not yet run |
+
+Full timing/coverage detail (per-case `CAMPAIGN-RESULTS-RANDOM.md`/`CAMPAIGN-RESULTS-RANDOM-VALID.md`, methodology in `../BASELINE-FUZZING-STEPS.md`) is in `../dynamic-analysis/LLM-SEED-TIMING.md`. The random-seed baseline (per supervisor request) isolates seed-generation strategy as the only variable: same harness, build, and exec timeout per case; no dictionary. Result across the 4 cases run so far is genuinely mixed, not a uniform "blind wins" or "blind is unnecessary" story:
+
+- **Random faster**: udhcpc6 (~4x) — the LLM seed's boundary-value knowledge didn't add measurable value here; unstructured mutation reaches the overflow just as directly.
+- **Blind faster**: man (~12.6x) and unlzma (found it; random didn't in 12x the time at the identical coverage ceiling) — cases where the specific triggering value is harder to stumble onto by chance even once the code is fully reachable.
+- **Blind categorically necessary**: bunzip2 — pure random never passes the format's magic-byte header at all (a gate-passing failure, not a search-depth one); even solving that gate mechanically (format-valid-random) still found nothing, reinforcing the separate structural-infeasibility proof from a third angle.
 
 **Stage 9's actual load-bearing purpose, made concrete by this table**:
 CVE-2017-15873 and CVE-2021-42374 are the two cases Tier B explicitly

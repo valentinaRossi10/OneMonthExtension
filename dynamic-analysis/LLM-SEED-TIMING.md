@@ -30,6 +30,7 @@ random bytes (`/dev/urandom`). Full detail per case in
 | CVE-2021-42373 (man) | **~71.8s** (`time:71762`) | **15,941** | 407s | 50,355 | 4 | Blind was **~12.6x faster**, ~19x fewer execs |
 | CVE-2026-29004 (udhcpc6) | **~93.2s** (`time:93248`) | **14,255** | 375s | 58,372 | 9 | **Random was ~4x faster**, ~5.7x fewer execs — the LLM seed advantage did not generalize to this case |
 | CVE-2017-15873 (bunzip2) | No crash | N/A | 1,142s (~19 min), 45 cycles | 296,317 | 0 | **Qualitatively different failure**: stuck at the format's magic-byte header gate the whole run (corpus never grew past 3 seeds, edges_found 3/143 = 2.10% vs. blind's 85.31%) — random mutation never even reached the code the bug lives in, vs. blind's genuine-but-unsuccessful search *inside* the format. See `CAMPAIGN-RESULTS-RANDOM.md`. |
+| CVE-2021-42374 (unlzma) | No crash | N/A | 58,741s (~16.3h), 81 cycles | 4,538,490 | 0 | **Same coverage ceiling as blind** (83.50% both) — not a reachability gap, a target-value search-efficiency gap: blind found the crash in ~80 min, random didn't in ~16.3h (~12x longer, ~26x more execs) despite exploring the format just as thoroughly. See `CAMPAIGN-RESULTS-RANDOM.md`. |
 
 The confirmed baseline runs give a genuinely mixed result: the blind
 taxonomy-derived seeds gave a large head start on `man` (a shallow argv-
@@ -60,14 +61,21 @@ executions, before any real mutation search:
 | Condition | Coverage | Edges found |
 |---|---|---|
 | Pure random (45 cycles, 296,317 execs) | 2.10% | 3 / 143 |
-| **Format-valid random (3 seeds, 22 execs)** | **56.64%** | **81 / 143** |
+| Format-valid random, early (3 seeds, 22 execs) | 56.64% | 81 / 143 |
+| **Format-valid random, final (61 cycles, 3,969,316 execs, ~15.7h)** | **84.62%** | **121 / 143** |
 | Blind LLM-seeded (calibration) | 85.31% | 122 / 143 |
 
 Confirms the diagnosis directly: pure random's near-zero coverage was a
 gate-passing failure, not a hard-interior problem. Once a well-formed
-input exists, the fuzzer starts most of the way to the blind campaign's
-own coverage before mutation has even begun. Full results (execs, time,
-any crash) pending — campaign in progress.
+input exists, the fuzzer reaches essentially the **same coverage ceiling
+as the blind campaign** (84.62% vs. 85.31%, 1 edge apart). And crucially:
+**even with that coverage reached, no crash was found** — 0 crashes in
+~15.7h/~4M execs, same as pure random and the original blind run. All
+three strategies now agree: the target isn't behind an unexplored code
+path, it's behind a specific value combination that undirected mutation
+of any kind (blind, random, or format-valid random) doesn't produce —
+consistent with the separately proven `int32` constraint analysis. See
+`cve-2017-15873/CAMPAIGN-RESULTS-RANDOM-VALID.md`.
 
 ## Unresolved cases (no crash of the target class within the time spent)
 
